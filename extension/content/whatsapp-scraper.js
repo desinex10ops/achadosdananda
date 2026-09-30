@@ -1,12 +1,12 @@
 // =======================================================================
-// ACHADOS DA NANDA PRO - CLONADOR UNIVERSAL PARA WHATSAPP WEB
+// ACHADOS DA NANDA PRO - CLONADOR UNIVERSAL PARA WHATSAPP WEB (V3)
 // Captura ofertas e grupos concorrentes com injeção automática de afiliados
 // =======================================================================
 
 (function () {
   'use strict';
 
-  console.log('[Achados da Nanda PRO] Clonador do WhatsApp Web carregado.');
+  console.log('[Achados da Nanda PRO] Clonador do WhatsApp Web v3 ativado.');
 
   let affiliateTags = {
     amazon: 'achadosnanda-20',
@@ -86,14 +86,14 @@
 
   // 2. Identifica o marketplace da URL
   function detectMarketplace(url) {
-    if (!url) return 'WhatsApp';
+    if (!url) return 'Mercado Livre';
     const low = url.toLowerCase();
     if (low.includes('amazon') || low.includes('amzn.to') || low.includes('a.co')) return 'Amazon';
     if (low.includes('shopee') || low.includes('shope.ee')) return 'Shopee';
     if (low.includes('mercadolivre') || low.includes('mercadolibre') || low.includes('meli.la')) return 'Mercado Livre';
     if (low.includes('magazineluiza') || low.includes('magalu') || low.includes('magazinevoce')) return 'Magalu';
     if (low.includes('shein')) return 'Shein';
-    return 'Oferta WhatsApp';
+    return 'Mercado Livre';
   }
 
   // 3. Extrai links de um texto
@@ -111,13 +111,29 @@
   // 4. Extrai preços (De / Por) do texto
   function extractPricesFromText(text) {
     if (!text) return { currentPrice: 0, originalPrice: 0 };
+
+    // Tenta capturar "De: R$ XX Por: R$ YY"
+    const porMatch = text.match(/(?:por|por\s*apenas|valor|por:)\s*[:]?\s*R\$\s*([\d.]+,\d{2}|\d+)/i);
+    const deMatch = text.match(/(?:de|de:)\s*[:]?\s*R\$\s*([\d.]+,\d{2}|\d+)/i);
+
+    let currentPrice = 0;
+    let originalPrice = 0;
+
+    if (porMatch) {
+      currentPrice = parseFloat(porMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
+    }
+    if (deMatch) {
+      originalPrice = parseFloat(deMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
+    }
+
+    if (currentPrice > 0) {
+      if (originalPrice === 0) originalPrice = currentPrice;
+      return { currentPrice, originalPrice };
+    }
+
+    // Fallback: procura todos os valores em R$
     const priceMatches = Array.from(text.matchAll(/R\$\s*([\d.]+,\d{2}|\d+)/gi));
     if (priceMatches.length === 0) {
-      const genericPrice = Array.from(text.matchAll(/(?:por|de|apenas)\s*[:]?\s*([\d.]+,\d{2})/gi));
-      if (genericPrice.length > 0) {
-        const p = parseFloat(genericPrice[0][1].replace(/\./g, '').replace(',', '.'));
-        return { currentPrice: p, originalPrice: p };
-      }
       return { currentPrice: 0, originalPrice: 0 };
     }
 
@@ -160,7 +176,55 @@
       null;
   }
 
-  // 8. Extrai dados completos de um elemento de mensagem
+  // 8. Converte imagem para base64 para o popup conseguir exibir sem erro de CSP
+  function getSafeImageSource(msgEl) {
+    if (!msgEl) return '';
+    const img = msgEl.querySelector('img[src*="blob:"], img[src*="http"], div[data-testid="image-thumb"] img, img');
+    if (!img) return '';
+
+    try {
+      // Se for imagem pequena ou já carregada, converte via canvas
+      if (img.complete && img.naturalWidth > 20 && img.naturalHeight > 20) {
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.min(img.naturalWidth, 320);
+        canvas.height = Math.min(img.naturalHeight, 320);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL('image/jpeg', 0.85);
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    return img.src || '';
+  }
+
+  // 9. Extrai título limpo das linhas da mensagem
+  function extractProductTitle(rawText) {
+    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+    // Remove linhas com links, preços ou cabeçalhos promocionais
+    const candidateLines = lines.filter(l => {
+      const low = l.toLowerCase();
+      if (low.startsWith('http') || low.includes('meli.la') || low.includes('shope.ee') || low.includes('amzn.to')) return false;
+      if (low.includes('de:') || low.includes('por:') || low.includes('cupom:') || low.includes('compre aqui')) return false;
+      if (low.includes('link:') || low.includes('r$')) return false;
+      return l.length > 5;
+    });
+
+    if (candidateLines.length === 0) return 'Achado Promocional';
+
+    // Se a primeira linha for um slogan e a segunda for o nome do produto (ex: "💛 4 Body Splash...")
+    let chosen = candidateLines.length > 1 && candidateLines[0].length < candidateLines[1].length
+      ? candidateLines[1]
+      : candidateLines[0];
+
+    // Limpa emojis do início
+    chosen = chosen.replace(/^[🚨🔥⚡💥👇📢👀✨🛍️📦👉💛💖💅👑]+\s*/, '').trim();
+    if (chosen.length > 95) chosen = chosen.substring(0, 95) + '...';
+    return chosen;
+  }
+
+  // 10. Extrai dados completos de um elemento de mensagem
   function parseMessageElement(msgEl) {
     if (!msgEl) return null;
 
@@ -173,19 +237,8 @@
     const marketplace = detectMarketplace(mainUrl);
     const { currentPrice, originalPrice } = extractPricesFromText(rawText);
     const coupon = extractCouponFromText(rawText);
-
-    // Imagem da mensagem ou do produto
-    const imgEl = msgEl.querySelector('img[src*="blob:"], img[src*="http"], div[data-testid="image-thumb"] img, img');
-    let imageUrl = '';
-    if (imgEl) {
-      imageUrl = imgEl.src || imgEl.getAttribute('data-src') || '';
-    }
-
-    // Título da oferta
-    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-    let title = lines.find(l => !l.startsWith('http') && !l.includes('meli.la') && l.length > 5 && !l.toLowerCase().includes('compre aqui')) || 'Achado VIP WhatsApp';
-    title = title.replace(/^[🚨🔥⚡💥👇📢👀✨🛍️📦👉💛💖]+\s*/, '').trim();
-    if (title.length > 95) title = title.substring(0, 95) + '...';
+    const imageUrl = getSafeImageSource(msgEl);
+    const title = extractProductTitle(rawText);
 
     const disc = originalPrice > currentPrice ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0;
     const convertedText = cloneAndConvertMessageText(rawText);
@@ -195,8 +248,8 @@
       isListing: false,
       marketplace,
       title,
-      currentPrice,
-      originalPrice,
+      currentPrice: currentPrice || (originalPrice || 0),
+      originalPrice: originalPrice || currentPrice,
       discountPercentage: disc,
       coupon,
       url: mainUrl,
@@ -208,29 +261,33 @@
     };
   }
 
-  // 9. Extrai todas as ofertas do chat central ativo
+  // 11. Extrai todas as ofertas do chat central ativo (somente mensagens de topo com data-id)
   function extractAllChatOffers() {
     const mainPane = getMainChatPane();
     if (!mainPane) return [];
 
-    // Busca apenas dentro do painel do chat central (#main)
-    const msgContainers = Array.from(mainPane.querySelectorAll(
-      'div.message-in, div.message-out, div[data-id], div[data-testid="msg-container"], .copyable-text'
-    ));
+    // Busca estritamente os nós raiz de cada mensagem no chat central
+    let msgNodes = Array.from(mainPane.querySelectorAll('div[data-id]'));
+    if (msgNodes.length === 0) {
+      msgNodes = Array.from(mainPane.querySelectorAll('div.message-in, div.message-out'));
+    }
+    if (msgNodes.length === 0) {
+      msgNodes = Array.from(mainPane.querySelectorAll('[data-testid="msg-container"]'));
+    }
 
     const seenUrls = new Set();
     const offers = [];
 
     // Itera do mais recente para o mais antigo
-    for (let i = msgContainers.length - 1; i >= 0; i--) {
-      const container = msgContainers[i];
-      const text = container.innerText || '';
+    for (let i = msgNodes.length - 1; i >= 0; i--) {
+      const node = msgNodes[i];
+      const text = node.innerText || '';
 
       // Verifica se contém links de compras conhecidos
       const hasOffer = /(http|meli\.la|shope\.ee|amzn\.to|mercadolivre|shopee|amazon|magalu)/i.test(text);
       if (!hasOffer) continue;
 
-      const parsed = parseMessageElement(container);
+      const parsed = parseMessageElement(node);
       if (parsed && parsed.url && !seenUrls.has(parsed.url)) {
         seenUrls.add(parsed.url);
         offers.unshift(parsed); // Mantém ordem cronológica
@@ -240,7 +297,7 @@
     return offers;
   }
 
-  // 10. Notificação Toast visual no WhatsApp Web
+  // 12. Notificação Toast visual no WhatsApp Web
   function showToast(text) {
     let toast = document.getElementById('nanda-whatsapp-toast');
     if (!toast) {
@@ -276,13 +333,15 @@
     }, 4000);
   }
 
-  // 11. Injeta botões "⚡ Clonar c/ Meu Link" estritamente nas mensagens do chat ativo (#main)
+  // 13. Injeta botões "⚡ Clonar c/ Meu Link" estritamente nas mensagens do chat ativo (#main)
   function injectCloneButtons() {
     const mainPane = getMainChatPane();
     if (!mainPane) return;
 
-    // Busca apenas as mensagens do chat central (#main), NUNCA na lista de contatos (#side)
-    const messages = mainPane.querySelectorAll('div.message-in, div.message-out, div[data-id], div[data-testid="msg-container"]');
+    let messages = Array.from(mainPane.querySelectorAll('div[data-id]'));
+    if (messages.length === 0) {
+      messages = Array.from(mainPane.querySelectorAll('div.message-in, div.message-out'));
+    }
 
     messages.forEach(msg => {
       if (msg.querySelector('.nanda-clone-btn')) return;
@@ -348,16 +407,15 @@
     injectCloneButtons();
   }, 1000);
 
-  // 12. Comunicação com o Popup da Extensão
+  // 14. Comunicação com o Popup da Extensão
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'EXTRACT_PRODUCT' || request.action === 'GET_HARVESTED_OFFERS') {
       const offers = extractAllChatOffers();
 
-      if (offers && offers.length > 1) {
-        // Encontrou múltiplas ofertas no chat -> Modo Lote (Batch)
+      if (offers && offers.length > 0) {
         sendResponse({
           success: true,
-          data: {
+          data: offers.length === 1 ? offers[0] : {
             isListing: true,
             totalFound: offers.length,
             marketplace: 'WhatsApp Web',
@@ -365,14 +423,6 @@
           },
           offers,
           marketplace: 'WhatsApp Web',
-        });
-      } else if (offers && offers.length === 1) {
-        // Encontrou 1 oferta no chat -> Modo Produto Único
-        sendResponse({
-          success: true,
-          data: offers[0],
-          offers,
-          marketplace: offers[0].marketplace || 'WhatsApp Web',
         });
       } else {
         const mainPane = getMainChatPane();

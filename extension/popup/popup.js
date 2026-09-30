@@ -288,8 +288,7 @@ function renderBatchProductCards() {
 
       return `
         <div class="batch-item ${isSelected ? 'selected' : ''}" data-id="${prod.id}">
-          <input type="checkbox" class="batch-checkbox" data-id="${prod.id}" ${isSelected ? 'checked' : ''}>
-          <img src="${prod.imageUrl || 'https://via.placeholder.com/80'}" class="batch-thumb" alt="Foto">
+          <img src="${prod.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80'}" class="batch-thumb" alt="Foto" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80'">
           <div class="batch-details">
             <h5 class="batch-item-title">${prod.title}</h5>
             <div>
