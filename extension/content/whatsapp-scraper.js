@@ -1,12 +1,12 @@
 // =======================================================================
-// ACHADOS DA NANDA PRO - CLONADOR UNIVERSAL PARA WHATSAPP WEB (V3)
+// ACHADOS DA NANDA PRO - CLONADOR UNIVERSAL PARA WHATSAPP WEB (V4)
 // Captura ofertas e grupos concorrentes com injeção automática de afiliados
 // =======================================================================
 
 (function () {
   'use strict';
 
-  console.log('[Achados da Nanda PRO] Clonador do WhatsApp Web v3 ativado.');
+  console.log('[Achados da Nanda PRO] Clonador do WhatsApp Web v4 ativo.');
 
   let affiliateTags = {
     amazon: 'achadosnanda-20',
@@ -112,7 +112,7 @@
   function extractPricesFromText(text) {
     if (!text) return { currentPrice: 0, originalPrice: 0 };
 
-    // Tenta capturar "De: R$ XX Por: R$ YY"
+    // Tenta capturar "Por: R$ YY" e "De: R$ XX"
     const porMatch = text.match(/(?:por|por\s*apenas|valor|por:)\s*[:]?\s*R\$\s*([\d.]+,\d{2}|\d+)/i);
     const deMatch = text.match(/(?:de|de:)\s*[:]?\s*R\$\s*([\d.]+,\d{2}|\d+)/i);
 
@@ -168,33 +168,29 @@
     return converted;
   }
 
-  // 7. Localiza o painel central do chat ativo (IGNORA o menu lateral #side)
-  function getMainChatPane() {
-    return document.querySelector('#main') ||
-      document.querySelector('div[data-testid="conversation-panel-wrapper"]') ||
-      document.querySelector('div[role="region"]') ||
-      null;
+  // 7. Filtra apenas elementos DENTRO da conversa aberta (IGNORA o menu lateral #side)
+  function isInsideChat(el) {
+    if (!el) return false;
+    return !el.closest('#side') && !el.closest('header') && !el.closest('div[data-testid="chat-list"]');
   }
 
-  // 8. Converte imagem para base64 para o popup conseguir exibir sem erro de CSP
-  function getSafeImageSource(msgEl) {
-    if (!msgEl) return '';
-    const img = msgEl.querySelector('img[src*="blob:"], img[src*="http"], div[data-testid="image-thumb"] img, img');
+  // 8. Tenta converter imagem de produto em base64 seguro
+  function findProductImage(el) {
+    const row = el.closest('div[data-id]') || el.closest('.message-in, .message-out') || el.closest('.copyable-text')?.parentElement?.parentElement || el.parentElement;
+    if (!row) return '';
+    const img = row.querySelector('img[src*="blob:"], img[src*="http"], div[data-testid="image-thumb"] img, img');
     if (!img) return '';
 
     try {
-      // Se for imagem pequena ou já carregada, converte via canvas
-      if (img.complete && img.naturalWidth > 20 && img.naturalHeight > 20) {
+      if (img.complete && img.naturalWidth > 30) {
         const canvas = document.createElement('canvas');
-        canvas.width = Math.min(img.naturalWidth, 320);
-        canvas.height = Math.min(img.naturalHeight, 320);
+        canvas.width = Math.min(img.naturalWidth, 300);
+        canvas.height = Math.min(img.naturalHeight, 300);
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         return canvas.toDataURL('image/jpeg', 0.85);
       }
-    } catch (e) {
-      // Fallback
-    }
+    } catch (e) {}
 
     return img.src || '';
   }
@@ -202,7 +198,6 @@
   // 9. Extrai título limpo das linhas da mensagem
   function extractProductTitle(rawText) {
     const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-    // Remove linhas com links, preços ou cabeçalhos promocionais
     const candidateLines = lines.filter(l => {
       const low = l.toLowerCase();
       if (low.startsWith('http') || low.includes('meli.la') || low.includes('shope.ee') || low.includes('amzn.to')) return false;
@@ -213,91 +208,74 @@
 
     if (candidateLines.length === 0) return 'Achado Promocional';
 
-    // Se a primeira linha for um slogan e a segunda for o nome do produto (ex: "💛 4 Body Splash...")
+    // Escolhe a linha com o nome do produto
     let chosen = candidateLines.length > 1 && candidateLines[0].length < candidateLines[1].length
       ? candidateLines[1]
       : candidateLines[0];
 
-    // Limpa emojis do início
     chosen = chosen.replace(/^[🚨🔥⚡💥👇📢👀✨🛍️📦👉💛💖💅👑]+\s*/, '').trim();
     if (chosen.length > 95) chosen = chosen.substring(0, 95) + '...';
     return chosen;
   }
 
-  // 10. Extrai dados completos de um elemento de mensagem
-  function parseMessageElement(msgEl) {
-    if (!msgEl) return null;
-
-    const rawText = (msgEl.innerText || msgEl.textContent || '').trim();
-    const links = extractUrlsFromText(rawText);
-    const mainUrl = links.find(u => !u.includes('whatsapp.com')) || links[0] || '';
-    if (!mainUrl && rawText.length < 15) return null;
-
-    const convertedUrl = convertToAffiliateLink(mainUrl);
-    const marketplace = detectMarketplace(mainUrl);
-    const { currentPrice, originalPrice } = extractPricesFromText(rawText);
-    const coupon = extractCouponFromText(rawText);
-    const imageUrl = getSafeImageSource(msgEl);
-    const title = extractProductTitle(rawText);
-
-    const disc = originalPrice > currentPrice ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0;
-    const convertedText = cloneAndConvertMessageText(rawText);
-
-    return {
-      id: `wpp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      isListing: false,
-      marketplace,
-      title,
-      currentPrice: currentPrice || (originalPrice || 0),
-      originalPrice: originalPrice || currentPrice,
-      discountPercentage: disc,
-      coupon,
-      url: mainUrl,
-      affiliateUrl: convertedUrl,
-      imageUrl,
-      shippingInfo: 'Verificar no link',
-      rawText,
-      convertedText,
-    };
-  }
-
-  // 11. Extrai todas as ofertas do chat central ativo (somente mensagens de topo com data-id)
+  // 10. Extrai todas as ofertas da conversa aberta de forma infalível
   function extractAllChatOffers() {
-    const mainPane = getMainChatPane();
-    if (!mainPane) return [];
-
-    // Busca estritamente os nós raiz de cada mensagem no chat central
-    let msgNodes = Array.from(mainPane.querySelectorAll('div[data-id]'));
-    if (msgNodes.length === 0) {
-      msgNodes = Array.from(mainPane.querySelectorAll('div.message-in, div.message-out'));
-    }
-    if (msgNodes.length === 0) {
-      msgNodes = Array.from(mainPane.querySelectorAll('[data-testid="msg-container"]'));
-    }
+    // Busca todos os links que estão dentro do chat (fora de #side)
+    const allLinks = Array.from(document.querySelectorAll('a[href]')).filter(a => {
+      const href = a.href || '';
+      return isInsideChat(a) &&
+        !href.includes('whatsapp.com') &&
+        (href.includes('http') || href.includes('meli.la') || href.includes('shope') || href.includes('amzn'));
+    });
 
     const seenUrls = new Set();
     const offers = [];
 
-    // Itera do mais recente para o mais antigo
-    for (let i = msgNodes.length - 1; i >= 0; i--) {
-      const node = msgNodes[i];
-      const text = node.innerText || '';
+    allLinks.forEach((a, idx) => {
+      try {
+        const rawUrl = a.href || '';
+        const cleanBase = rawUrl.split('?')[0];
+        if (seenUrls.has(cleanBase)) return;
+        seenUrls.add(cleanBase);
 
-      // Verifica se contém links de compras conhecidos
-      const hasOffer = /(http|meli\.la|shope\.ee|amzn\.to|mercadolivre|shopee|amazon|magalu)/i.test(text);
-      if (!hasOffer) continue;
+        // Pega o texto da mensagem inteira
+        const msgBox = a.closest('.copyable-text') || a.closest('div[data-id]') || a.closest('div[data-testid="msg-container"]') || a.parentElement?.parentElement;
+        const text = msgBox ? (msgBox.innerText || '') : '';
 
-      const parsed = parseMessageElement(node);
-      if (parsed && parsed.url && !seenUrls.has(parsed.url)) {
-        seenUrls.add(parsed.url);
-        offers.unshift(parsed); // Mantém ordem cronológica
+        const { currentPrice, originalPrice } = extractPricesFromText(text);
+        const coupon = extractCouponFromText(text);
+        const title = extractProductTitle(text);
+        const imageUrl = findProductImage(a);
+        const affiliateUrl = convertToAffiliateLink(rawUrl);
+        const marketplace = detectMarketplace(rawUrl);
+        const disc = originalPrice > currentPrice ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0;
+        const convertedText = cloneAndConvertMessageText(text);
+
+        offers.push({
+          id: `wpp_${idx}_${Date.now()}`,
+          isListing: false,
+          marketplace,
+          title,
+          currentPrice: currentPrice || originalPrice || 0,
+          originalPrice: originalPrice || currentPrice || 0,
+          discountPercentage: disc,
+          coupon,
+          url: rawUrl,
+          affiliateUrl,
+          imageUrl,
+          shippingInfo: 'Verificar no link',
+          rawText: text,
+          convertedText,
+        });
+      } catch (e) {
+        console.error(e);
       }
-    }
+    });
 
     return offers;
   }
 
-  // 12. Notificação Toast visual no WhatsApp Web
+  // 11. Toast visual no WhatsApp Web
   function showToast(text) {
     let toast = document.getElementById('nanda-whatsapp-toast');
     if (!toast) {
@@ -333,25 +311,18 @@
     }, 4000);
   }
 
-  // 13. Injeta botões "⚡ Clonar c/ Meu Link" estritamente nas mensagens do chat ativo (#main)
+  // 12. Injeta botões "⚡ Clonar c/ Meu Link" direto embaixo de cada link de oferta
   function injectCloneButtons() {
-    const mainPane = getMainChatPane();
-    if (!mainPane) return;
+    const allLinks = Array.from(document.querySelectorAll('a[href]')).filter(a => {
+      const href = a.href || '';
+      return isInsideChat(a) &&
+        !href.includes('whatsapp.com') &&
+        (href.includes('http') || href.includes('meli.la') || href.includes('shope') || href.includes('amzn'));
+    });
 
-    let messages = Array.from(mainPane.querySelectorAll('div[data-id]'));
-    if (messages.length === 0) {
-      messages = Array.from(mainPane.querySelectorAll('div.message-in, div.message-out'));
-    }
-
-    messages.forEach(msg => {
-      if (msg.querySelector('.nanda-clone-btn')) return;
-
-      const text = msg.innerText || '';
-      const hasOffer = /(http|meli\.la|shope\.ee|amzn\.to|mercadolivre|shopee|amazon|magalu)/i.test(text);
-      if (!hasOffer) return;
-
-      const targetBox = msg.querySelector('.copyable-text') || msg;
-      if (!targetBox) return;
+    allLinks.forEach(a => {
+      const container = a.closest('.copyable-text') || a.parentElement;
+      if (!container || container.querySelector('.nanda-clone-btn')) return;
 
       const btn = document.createElement('button');
       btn.className = 'nanda-clone-btn';
@@ -382,21 +353,22 @@
         e.stopPropagation();
         e.preventDefault();
 
-        const data = parseMessageElement(msg);
-        if (!data) return;
+        const msgBox = a.closest('.copyable-text') || a.closest('div[data-id]') || a.parentElement?.parentElement;
+        const text = msgBox ? (msgBox.innerText || '') : '';
+        const converted = cloneAndConvertMessageText(text);
 
-        navigator.clipboard.writeText(data.convertedText).then(() => {
+        navigator.clipboard.writeText(converted).then(() => {
           showToast(`⚡ <b>Oferta Clonada!</b> Mensagem copiada com seu link de afiliada.`);
         }).catch(() => {
           showToast(`⚠️ Não foi possível copiar automaticamente.`);
         });
       });
 
-      targetBox.appendChild(btn);
+      container.appendChild(btn);
     });
   }
 
-  // Observa novas mensagens chegando apenas no chat principal
+  // Observa novas mensagens chegando
   const observer = new MutationObserver(() => {
     injectCloneButtons();
   });
@@ -407,7 +379,7 @@
     injectCloneButtons();
   }, 1000);
 
-  // 14. Comunicação com o Popup da Extensão
+  // 13. Comunicação com o Popup da Extensão
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'EXTRACT_PRODUCT' || request.action === 'GET_HARVESTED_OFFERS') {
       const offers = extractAllChatOffers();
@@ -425,18 +397,10 @@
           marketplace: 'WhatsApp Web',
         });
       } else {
-        const mainPane = getMainChatPane();
-        if (!mainPane) {
-          sendResponse({
-            success: false,
-            error: 'Abra uma conversa ou grupo no WhatsApp Web.',
-          });
-        } else {
-          sendResponse({
-            success: false,
-            error: 'Nenhuma oferta com link encontrada nesta conversa aberta.',
-          });
-        }
+        sendResponse({
+          success: false,
+          error: 'Abra uma conversa com ofertas no WhatsApp Web.',
+        });
       }
       return true;
     }
