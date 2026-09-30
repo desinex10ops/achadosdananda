@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Achados da Nanda PRO</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo">⚡</div>
+        <div>
+          <h2>Achados da Nanda</h2>
+          <span>Capturador de Ofertas</span>
+        </div>
+      </div>
+      <div class="status-badge" id="statusBadge">
+        <span class="dot"></span>
+        <span id="statusText">Conectando...</span>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="content">
+      <!-- Loading State -->
+      <div id="loadingState" class="state-panel">
+        <div class="spinner"></div>
+        <p>Analisando ofertas na página...</p>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="state-panel hidden">
+        <div class="empty-icon">🛍️</div>
+        <h3>Nenhum produto detectado</h3>
+        <p>Abra uma página de produto/ofertas no Mercado Livre, Shopee, Amazon ou qualquer conversa com ofertas no WhatsApp Web.</p>
+        <button id="btnRetry" class="btn btn-secondary">Tentar Novamente</button>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- MODO 1: PRODUTO ÚNICO                          -->
+      <!-- ============================================== -->
+      <div id="singleProductView" class="hidden">
+        <div class="card product-card">
+          <img id="productImage" src="" alt="Produto" class="product-thumb">
+          <div class="product-info">
+            <span class="marketplace-pill" id="productMarketplace">Mercado Livre</span>
+            <h4 id="productTitle" class="product-title">Título</h4>
+            <div class="price-row">
+              <span id="productOrigPrice" class="price-old">R$ 0,00</span>
+              <span id="productCurrPrice" class="price-current">R$ 0,00</span>
+              <span id="productDiscount" class="discount-badge">0% OFF</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Link de Afiliado (ou da página):</label>
+          <input type="text" id="affiliateUrl" class="input">
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Template:</label>
+            <select id="templateSelect" class="input"></select>
+          </div>
+          <div class="form-group">
+            <label>Grupo:</label>
+            <select id="groupSelect" class="input"></select>
+          </div>
+        </div>
+
+        <div class="preview-card">
+          <div class="preview-header">
+            <span>💬 Preview WhatsApp</span>
+            <button id="btnCopyText" class="btn-tiny">Copiar</button>
+          </div>
+          <div class="whatsapp-bubble" id="whatsappPreview"></div>
+        </div>
+
+        <div class="actions">
+          <button id="btnAddToQueue" class="btn btn-primary">
+            ⚡ Adicionar à Fila
+          </button>
+          <div class="action-grid">
+            <button id="btnSaveRadar" class="btn btn-secondary">
+              🔥 Salvar no Radar
+            </button>
+            <button id="btnOpenWhatsApp" class="btn btn-whatsapp">
+              💬 Abrir WhatsApp
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- MODO 2: LOTE / VITRINE DE OFERTAS (MULTI-ITEM) -->
+      <!-- ============================================== -->
+      <div id="batchListingView" class="hidden">
+        <!-- Vitrine Banner -->
+        <div class="batch-header">
+          <div>
+            <span class="badge-fire">🔥 Vitrine Detectada</span>
+            <h3 id="batchTitle" class="batch-title">Ofertas Encontradas</h3>
+          </div>
+          <span class="shield-badge" title="Leitura 100% no DOM do navegador, sem requisições robotizadas externas.">
+            🛡️ Anti-Ban Ativo
+          </span>
+        </div>
+
+        <!-- Quick Filters -->
+        <div class="quick-filters">
+          <button id="btnSelectAll" class="filter-chip active">Todas</button>
+          <button id="btnSelect40" class="filter-chip">&gt; 40% OFF</button>
+          <button id="btnSelect50" class="filter-chip">&gt; 50% OFF</button>
+          <button id="btnDeselectAll" class="filter-chip">Desmarcar</button>
+        </div>
+
+        <!-- Products List -->
+        <div id="batchProductsList" class="batch-list">
+          <!-- Items will be injected here -->
+        </div>
+
+        <!-- Batch Settings -->
+        <div class="grid-2 mt-2">
+          <div class="form-group">
+            <label>Template padrão:</label>
+            <select id="batchTemplateSelect" class="input"></select>
+          </div>
+          <div class="form-group">
+            <label>Grupo de destino:</label>
+            <select id="batchGroupSelect" class="input"></select>
+          </div>
+        </div>
+
+        <!-- Progress Bar for Batch Dispatch -->
+        <div id="batchProgressContainer" class="progress-container hidden">
+          <div class="progress-bar">
+            <div id="batchProgressBar" class="progress-fill"></div>
+          </div>
+          <span id="batchProgressText" class="progress-text">Enviando 0/0...</span>
+        </div>
+
+        <!-- Batch Actions -->
+        <div class="actions mt-2">
+          <button id="btnBatchAddToQueue" class="btn btn-primary">
+            ⚡ Adicionar Selecionados à Fila (<span id="selectedCountQueue">0</span>)
+          </button>
+          <button id="btnBatchSaveRadar" class="btn btn-secondary">
+            🔥 Salvar Selecionados no Radar (<span id="selectedCountRadar">0</span>)
+          </button>
+        </div>
+      </div>
+
+      <!-- Feedback Toast -->
+      <div id="feedbackMessage" class="feedback hidden"></div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <a href="http://localhost:3000" target="_blank">Abrir Central de Ofertas ↗</a>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

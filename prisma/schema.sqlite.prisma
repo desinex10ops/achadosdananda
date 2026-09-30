@@ -1,0 +1,467 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  avatarUrl    String?
+  role         String    @default("ADMIN")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  settings     Settings?
+}
+
+model Settings {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultIntervalMinutes Int      @default(30)
+  maxOffersPerHour       Int      @default(4)
+  maxDailyOffers         Int      @default(20)
+  antiRepeatHours        Int      @default(48)
+  autoQueueEnabled       Boolean  @default(false)
+  defaultTemplateId      String?
+  metaPixelId            String?
+  updatedAt              DateTime @updatedAt
+}
+
+model Marketplace {
+  id                String          @id @default(cuid())
+  name              String          @unique
+  slug              String          @unique
+  icon              String?
+  badgeColor        String          @default("gray")
+  isActive          Boolean         @default(true)
+  commissionRate    Float           @default(0.0)
+  affiliateTag      String?
+  appId             String?
+  apiKey            String?
+  apiSecret         String?
+  defaultUrlPattern String?
+  products          Product[]
+  offers            Offer[]
+  coupons           Coupon[]
+  affiliateLinks    AffiliateLink[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model Product {
+  id               String          @id @default(cuid())
+  marketplaceId    String
+  marketplace      Marketplace     @relation(fields: [marketplaceId], references: [id])
+  name             String
+  description      String?
+  category         String          @default("Geral")
+  subcategory      String?
+  brand            String?
+  originalPrice    Float
+  currentPrice     Float
+  imageUrl         String
+  additionalImages String? // JSON string array
+  originalUrl      String
+  affiliateUrl     String?
+  stock            Int?
+  expirationDate   DateTime?
+  notes            String?
+  offers           Offer[]
+  affiliateLinks   AffiliateLink[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model Offer {
+  id                 String         @id @default(cuid())
+  productId          String
+  product            Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  marketplaceId      String
+  marketplace        Marketplace    @relation(fields: [marketplaceId], references: [id])
+  title              String
+  callout            String?
+  originalPrice      Float
+  currentPrice       Float
+  discountPercentage Float
+  savedAmount        Float
+  couponCode         String?
+  shippingInfo       String?        @default("Frete Grátis")
+  originalUrl        String
+  affiliateUrl       String
+  status             String         @default("QUEUED") // DRAFT, RADAR, QUEUED, SCHEDULED, PUBLISHED, IGNORED, PAUSED
+  notes              String?
+  priority           Int            @default(1)
+  publications       Publication[]
+  clicks             Click[]
+  conversions        Conversion[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+model Template {
+  id                String        @id @default(cuid())
+  name              String
+  type              String        @default("CUSTOM") // OFERTA_RELAMPAGO, OFERTA_DO_DIA, ACHADINHO, CUPOM, SUPER_DESCONTO, OFERTA_TECH, OFERTA_CASA, OFERTA_GERAL, CUSTOM
+  emoji             String        @default("🔥")
+  header            String
+  structure         String // Template pattern with placeholders {TITULO}, {PRECO_DE}, {PRECO_POR}, etc.
+  cta               String        @default("👇 COMPRE PELO LINK ABAIXO:")
+  footer            String?
+  showOriginalPrice Boolean       @default(true)
+  showDiscount      Boolean       @default(true)
+  showCoupon        Boolean       @default(true)
+  showShipping      Boolean       @default(true)
+  isDefault         Boolean       @default(false)
+  publications      Publication[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model GroupCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  groups      Group[]
+  createdAt   DateTime @default(now())
+}
+
+model Group {
+  id                 String             @id @default(cuid())
+  name               String
+  categoryId         String
+  category           GroupCategory      @relation(fields: [categoryId], references: [id])
+  description        String?
+  platform           String             @default("WHATSAPP") // WHATSAPP, TELEGRAM
+  allowedHoursStart  String             @default("08:00")
+  allowedHoursEnd    String             @default("22:00")
+  maxOffersPerHour   Int                @default(2)
+  maxDailyOffers     Int                @default(15)
+  minIntervalMinutes Int                @default(30)
+  isActive           Boolean            @default(true)
+  inviteLink         String?
+  isVipRouter        Boolean            @default(false)
+  maxMembers         Int                @default(1000)
+  currentClicks      Int                @default(0)
+  priority           Int                @default(1)
+  publicationGroups  PublicationGroup[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  name        String?
+  phone       String?
+  source      String   @default("VIP_PAGE")
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+}
+
+model Publication {
+  id                String             @id @default(cuid())
+  offerId           String
+  offer             Offer              @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  templateId        String
+  template          Template           @relation(fields: [templateId], references: [id])
+  scheduledFor      DateTime?
+  publishedAt       DateTime?
+  status            String             @default("PENDING") // PENDING, SCHEDULED, PUBLISHED, ERROR, PAUSED
+  priority          Int                @default(1)
+  orderIndex        Int                @default(0)
+  errorMessage      String?
+  generatedText     String
+  publicationGroups PublicationGroup[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model PublicationGroup {
+  id            String      @id @default(cuid())
+  publicationId String
+  publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  groupId       String
+  group         Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  status        String      @default("PENDING") // PENDING, PUBLISHED, ERROR
+  publishedAt   DateTime?
+  errorMessage  String?
+  createdAt     DateTime    @default(now())
+}
+
+model Coupon {
+  id            String      @id @default(cuid())
+  marketplaceId String
+  marketplace   Marketplace @relation(fields: [marketplaceId], references: [id])
+  code          String
+  discount      String // e.g. "R$ 20 OFF" or "15% OFF"
+  minSpend      Float?
+  validUntil    DateTime?
+  category      String?
+  link          String?
+  status        String      @default("ACTIVE") // ACTIVE, EXPIRED, EXPIRING_SOON
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model AffiliateLink {
+  id               String       @id @default(cuid())
+  productId        String?
+  product          Product?     @relation(fields: [productId], references: [id], onDelete: SetNull)
+  marketplaceId    String
+  marketplace      Marketplace  @relation(fields: [marketplaceId], references: [id])
+  originalUrl      String
+  affiliateUrl     String
+  campaign         String?
+  clicksCount      Int          @default(0)
+  conversionsCount Int          @default(0)
+  clicks           Click[]
+  conversions      Conversion[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model Click {
+  id        String         @id @default(cuid())
+  linkId    String?
+  link      AffiliateLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  offerId   String?
+  offer     Offer?         @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  ipAddress String?
+  userAgent String?
+  referrer  String?
+  createdAt DateTime       @default(now())
+}
+
+model Conversion {
+  id              String         @id @default(cuid())
+  linkId          String?
+  link            AffiliateLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  offerId         String?
+  offer           Offer?         @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  orderId         String?
+  orderValue      Float
+  commissionValue Float
+  status          String         @default("PENDING") // PENDING, APPROVED, CANCELLED, PAID
+  convertedAt     DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+}
+
+model AutomationRule {
+  id                String   @id @default(cuid())
+  name              String
+  isActive          Boolean  @default(true)
+  conditionField    String // e.g. "discountPercentage", "category", "hasCoupon"
+  conditionOperator String // e.g. ">=", "==", "contains"
+  conditionValue    String // e.g. "30", "Tecnologia", "true"
+  actionType        String // e.g. "ADD_TO_QUEUE", "SET_PRIORITY", "APPLY_TEMPLATE"
+  actionPayload     String // JSON details
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String   @default("INFO") // INFO, SUCCESS, WARNING, ERROR
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  module    String
+  details   String?
+  status    String   @default("SUCCESS") // SUCCESS, ERROR, WARN
+  createdAt DateTime @default(now())
+}
+
+// ==========================================
+// MÓDULO DE AUTOMAÇÃO DE INSTAGRAM PROFISSIONAL
+// ==========================================
+
+model InstagramAccount {
+  id                  String                @id @default(cuid())
+  name                String                // ex: "@achadosdananda"
+  instagramId         String                @unique // Meta Instagram Business/Creator Account ID
+  facebookPageId      String?               // Facebook Page conectada
+  accessToken         String                // Meta Graph API Long-Lived Access Token
+  tokenExpiresAt      DateTime?
+  webhookSecret       String?
+  webhookVerified     Boolean               @default(false)
+  isActive            Boolean               @default(true)
+  rateLimitPerHour    Int                   @default(60)
+  rateLimitPerDay     Int                   @default(600)
+  operatingHoursStart String?               @default("08:00") // Formato "HH:mm"
+  operatingHoursEnd   String?               @default("22:00")
+  timezone            String                @default("America/Sao_Paulo")
+  automations         InstagramAutomation[]
+  logs                InstagramLog[]
+  jobs                InstagramJob[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+}
+
+model InstagramAutomation {
+  id                   String                 @id @default(cuid())
+  accountId            String
+  account              InstagramAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name                 String
+  description          String?
+  isActive             Boolean                @default(true)
+  
+  // Gatilho
+  triggerType          String                 @default("COMMENT_ANY") // COMMENT_ANY, COMMENT_POST, COMMENT_REEL, STORY_REPLY, DIRECT_MESSAGE
+  targetMediaId        String?                // ID específico do post/reel ou null para qualquer publicação
+  targetMediaUrl       String?
+  
+  // Regras de correspondência de palavras-chave
+  matchType            String                 @default("CONTAINS") // EXACT, CONTAINS, STARTS_WITH, REGEX, ANY
+  keywords             String                 // Lista em JSON ou separada por vírgula: "EU QUERO, QUERO, LINK, PRECO"
+  caseSensitive        Boolean                @default(false)
+  ignoreAccents        Boolean                @default(true)
+  
+  // Resposta Pública (Comentário)
+  replyInPublic        Boolean                @default(true)
+  publicReplyTemplate  String?                @default("Oi @{username}! Enviamos o link detalhado no seu Direct 💖 Dá uma olhadinha!")
+  likeComment          Boolean                @default(true)
+  
+  // Resposta Privada (Direct Message)
+  sendDirectMessage    Boolean                @default(true)
+  dmMessageTemplate    String                 @default("Olá @{username}! Tudo bem?\n\nIdentificamos que você pediu o link da oferta:\n🔗 {link}\n\nAproveite antes que o preço suba ou o estoque acabe!")
+  dmButtonText         String?                @default("Ver Oferta")
+  dmButtonUrl          String?                // Se nulo, usa o {link}
+  
+  // Link e Campanha
+  affiliateLinkId      String?
+  customLink           String?
+  campaignCode         String?
+  
+  // Temporização e Humanização (Anti-ban)
+  delaySeconds         Int                    @default(15) // Atraso base em segundos
+  jitterSeconds        Int                    @default(10) // Variação aleatória (0 a jitterSeconds)
+  maxExecutionsPerUser Int                    @default(1) // Máximo de execuções por usuário nesta mídia
+  workingHoursOnly     Boolean                @default(false)
+  
+  // Tags a atribuir ao usuário
+  tagsToAdd            String?                // JSON ou CSV, ex: "interessado,shopee"
+  
+  // Métricas
+  totalTriggered       Int                    @default(0)
+  totalSuccess         Int                    @default(0)
+  totalFailed          Int                    @default(0)
+  
+  conditions           AutomationCondition[]
+  actions              AutomationAction[]
+  logs                 InstagramLog[]
+  jobs                 InstagramJob[]
+  
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+}
+
+model AutomationCondition {
+  id           String              @id @default(cuid())
+  automationId String
+  automation   InstagramAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  type         String              // USER_NOT_TAGGED, USER_TAGGED, FIRST_TIME_USER, TIME_WINDOW, MEDIA_MATCH
+  operator     String              @default("EQUALS") // EQUALS, NOT_EQUALS, CONTAINS, NOT_CONTAINS
+  value        String              // ex: "vip", "08:00-22:00"
+  createdAt    DateTime            @default(now())
+}
+
+model AutomationAction {
+  id           String              @id @default(cuid())
+  automationId String
+  automation   InstagramAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  actionType   String              // SEND_DM, REPLY_COMMENT, LIKE_COMMENT, ADD_TAG, REMOVE_TAG, WEBHOOK_POST
+  order        Int                 @default(1)
+  payload      String              // JSON detalhado da ação
+  createdAt    DateTime            @default(now())
+}
+
+model InstagramJob {
+  id              String               @id @default(cuid())
+  accountId       String
+  account         InstagramAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  automationId    String?
+  automation      InstagramAutomation? @relation(fields: [automationId], references: [id], onDelete: SetNull)
+  idempotencyKey  String               @unique // Chave única para impedir envio duplicado: "acc:aut:comment:action"
+  actionType      String               // SEND_DM, REPLY_COMMENT, LIKE_COMMENT
+  status          String               @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED, SKIPPED
+  scheduledFor    DateTime             @default(now())
+  executedAt      DateTime?
+  retryCount      Int                  @default(0)
+  maxRetries      Int                  @default(3)
+  targetUserId    String               // IGSID do usuário no Instagram
+  targetUsername  String?
+  targetCommentId String?
+  targetMediaId   String?
+  payload         String               // JSON com texto, url, botões
+  errorMessage    String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+}
+
+model InstagramLog {
+  id                String               @id @default(cuid())
+  accountId         String
+  account           InstagramAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  automationId      String?
+  automation        InstagramAutomation? @relation(fields: [automationId], references: [id], onDelete: SetNull)
+  eventType         String               // WEBHOOK_RECEIVED, KEYWORD_MATCH, RULE_PASSED, RULE_FAILED, DM_SENT, REPLY_SENT, RATE_LIMIT_HIT, ERROR, SIMULATION
+  level             String               @default("INFO") // INFO, WARN, ERROR, SUCCESS
+  message           String
+  details           String?              // JSON com payload recebido ou dados de depuração
+  instagramUserId   String?
+  instagramUsername String?
+  commentId         String?
+  mediaId           String?
+  createdAt         DateTime             @default(now())
+}
+
+model InstagramUserTag {
+  id                String   @id @default(cuid())
+  instagramUserId   String
+  instagramUsername String?
+  tag               String
+  createdAt         DateTime @default(now())
+
+  @@unique([instagramUserId, tag])
+}
+
+model InstagramWebhookEvent {
+  id        String   @id @default(cuid())
+  eventId   String?
+  field     String   // "comments", "messages", "mentions"
+  payload   String   // JSON bruto
+  status    String   @default("PROCESSED") // RECEIVED, PROCESSED, IGNORED, FAILED
+  error     String?
+  createdAt DateTime @default(now())
+}
+
+model InstagramCampaign {
+  id               String   @id @default(cuid())
+  name             String
+  code             String   @unique
+  description      String?
+  totalClicks      Int      @default(0)
+  totalConversions Int      @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="nandaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f43f5e" />
+      <stop offset="50%" stop-color="#e11d48" />
+      <stop offset="100%" stop-color="#fbbf24" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#nandaGrad)" />
+  <circle cx="256" cy="256" r="190" fill="#0f172a" />
+  <path d="M256 140 L340 330 L270 330 L256 280 L242 330 L172 330 Z" fill="#ffffff" opacity="0.15" />
+  <text x="256" y="295" font-family="system-ui, -apple-system, sans-serif" font-size="160" font-weight="900" fill="#ffffff" text-anchor="middle">N</text>
+  <circle cx="340" cy="180" r="28" fill="#fbbf24" />
+  <text x="340" y="190" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="bold" fill="#0f172a" text-anchor="middle">★</text>
+</svg>
