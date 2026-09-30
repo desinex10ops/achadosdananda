@@ -196,6 +196,8 @@ function convertAffiliateLink(url, marketplace) {
   }
 }
 
+const FALLBACK_PRODUCT_IMAGE = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' fill='%23fce7f3'/%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-size='28' text-anchor='middle' dominant-baseline='central'%3E🛍️%3C/text%3E%3C/svg%3E";
+
 // 5. Renderizar Modo 1: Produto Único
 function renderSingleView(product) {
   currentSingleProduct = product;
@@ -206,7 +208,8 @@ function renderSingleView(product) {
 
   productTitle.innerText = product.title;
   productMarketplace.innerText = product.marketplace || 'Oferta';
-  productImage.src = product.imageUrl || 'https://via.placeholder.com/150';
+  productImage.src = product.imageUrl || FALLBACK_PRODUCT_IMAGE;
+  productImage.onerror = () => { productImage.src = FALLBACK_PRODUCT_IMAGE; };
 
   const orig = product.originalPrice || product.currentPrice;
   const curr = product.currentPrice;
@@ -288,7 +291,7 @@ function renderBatchProductCards() {
 
       return `
         <div class="batch-item ${isSelected ? 'selected' : ''}" data-id="${prod.id}">
-          <img src="${prod.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80'}" class="batch-thumb" alt="Foto" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80'">
+          <img src="${prod.imageUrl || FALLBACK_PRODUCT_IMAGE}" class="batch-thumb" alt="Foto" onerror="this.onerror=null;this.src=FALLBACK_PRODUCT_IMAGE">
           <div class="batch-details">
             <h5 class="batch-item-title">${prod.title}</h5>
             <div>
