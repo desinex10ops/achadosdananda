@@ -266,17 +266,65 @@ function updateGeneratedMessage() {
 templateSelect.addEventListener('change', updateGeneratedMessage);
 affiliateUrlInput.addEventListener('input', updateGeneratedMessage);
 
+function deduplicateOffers(offers) {
+  if (!Array.isArray(offers)) return [];
+  const urlMap = new Map();
+  const titleMap = new Map();
+
+  for (const offer of offers) {
+    if (!offer) continue;
+
+    const rawUrl = (offer.url || offer.affiliateUrl || '').trim();
+    const cleanUrl = rawUrl.split('?')[0].replace(/\/+$/, '').toLowerCase();
+
+    const cleanTitle = (offer.title || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 40);
+
+    const hasUrl = cleanUrl && cleanUrl.length > 5;
+    const hasTitle = cleanTitle && cleanTitle.length > 6 && cleanTitle !== 'achado promocional';
+
+    let existing = null;
+    if (hasUrl && urlMap.has(cleanUrl)) {
+      existing = urlMap.get(cleanUrl);
+    } else if (hasTitle && titleMap.has(cleanTitle)) {
+      existing = titleMap.get(cleanTitle);
+    }
+
+    if (existing) {
+      if (offer.currentPrice > 0 && (!existing.currentPrice || existing.currentPrice === 0)) {
+        existing.currentPrice = offer.currentPrice;
+        existing.originalPrice = offer.originalPrice;
+        existing.title = offer.title;
+        if (offer.imageUrl) existing.imageUrl = offer.imageUrl;
+      }
+      continue;
+    }
+
+    if (hasUrl) urlMap.set(cleanUrl, offer);
+    if (hasTitle) titleMap.set(cleanTitle, offer);
+  }
+
+  return Array.from(new Set([...urlMap.values(), ...titleMap.values()]));
+}
+
 // 6. Renderizar Modo 2: Lote / Auto-Scroll Harvester
 function renderBatchView(data) {
-  currentBatchProducts = data.products;
-  selectedProductIds = new Set(data.products.map((p) => p.id));
+  const uniqueProducts = deduplicateOffers(data.products || []);
+  currentBatchProducts = uniqueProducts;
+  selectedProductIds = new Set(uniqueProducts.map((p) => p.id));
 
   loadingState.classList.add('hidden');
   emptyState.classList.add('hidden');
   singleProductView.classList.add('hidden');
   batchListingView.classList.remove('hidden');
 
-  batchTitle.innerText = `${data.totalFound} Ofertas no ${data.marketplace || 'Site'}`;
+  batchTitle.innerText = `${uniqueProducts.length} Ofertas Únicas no ${data.marketplace || 'Site'}`;
 
   renderBatchProductCards();
   updateBatchCounters();

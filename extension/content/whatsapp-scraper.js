@@ -344,8 +344,54 @@
         convertedText,
       };
 
-      // Guarda no cache acumulativo
-      harvestedOffersCache.set(cleanBase, offerObj);
+      const normalizedUrl = cleanBase.replace(/\/+$/, '').toLowerCase();
+      const normalizedTitle = title
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 40);
+
+      // Evita duplicatas no cache por URL ou por Título idêntico
+      let existingKey = null;
+      for (const [key, cached] of harvestedOffersCache.entries()) {
+        const cachedUrl = (cached.url || '').split('?')[0].replace(/\/+$/, '').toLowerCase();
+        const cachedTitle = (cached.title || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .substring(0, 40);
+
+        if (cachedUrl === normalizedUrl || (normalizedTitle.length > 8 && normalizedTitle !== 'achado promocional' && cachedTitle === normalizedTitle)) {
+          existingKey = key;
+          break;
+        }
+      }
+
+      if (existingKey) {
+        const prev = harvestedOffersCache.get(existingKey);
+        if (offerObj.currentPrice > 0 && (!prev.currentPrice || prev.currentPrice === 0)) {
+          prev.currentPrice = offerObj.currentPrice;
+          prev.originalPrice = offerObj.originalPrice;
+          prev.discountPercentage = offerObj.discountPercentage;
+          prev.title = offerObj.title;
+        }
+        if (!prev.imageUrl && offerObj.imageUrl) {
+          prev.imageUrl = offerObj.imageUrl;
+        }
+        if (!prev.coupon && offerObj.coupon) {
+          prev.coupon = offerObj.coupon;
+        }
+        continue;
+      }
+
+      // Guarda no cache acumulativo único
+      harvestedOffersCache.set(normalizedUrl, offerObj);
     }
 
     return Array.from(harvestedOffersCache.values());
