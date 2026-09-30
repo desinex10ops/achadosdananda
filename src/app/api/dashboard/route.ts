@@ -92,15 +92,12 @@ export async function GET() {
     });
 
     // 5. Dados de evolução dos últimos 7 dias para o gráfico
-    const chartData = [
-      { day: "Seg", cliques: 142, conversoes: 12, comissao: 84.5 },
-      { day: "Ter", cliques: 198, conversoes: 18, comissao: 132.0 },
-      { day: "Qua", cliques: 245, conversoes: 24, comissao: 189.2 },
-      { day: "Qui", cliques: 310, conversoes: 29, comissao: 245.8 },
-      { day: "Sex", cliques: 420, conversoes: 41, comissao: 360.4 },
-      { day: "Sáb", cliques: 490, conversoes: 48, comissao: 415.0 },
-      { day: "Dom", cliques: 530, conversoes: 52, comissao: 480.9 },
-    ];
+    const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const chartData = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return { day: days[d.getDay()], cliques: 0, conversoes: 0, comissao: 0 };
+    });
 
     return NextResponse.json({
       success: true,
@@ -109,9 +106,9 @@ export async function GET() {
           offersTodayCount,
           queuedOffersCount,
           scheduledOffersCount,
-          totalClicks: totalClicks || 2335,
-          totalConversions: totalConversions || 224,
-          estimatedCommission: estimatedCommission || 1907.8,
+          totalClicks: totalClicks || 0,
+          totalConversions: totalConversions || 0,
+          estimatedCommission: estimatedCommission || 0,
         },
         featuredOffers,
         upcomingPublications,

@@ -1,10 +1,11 @@
-const API_BASE = 'http://localhost:3000';
+let API_BASE = 'http://localhost:3000';
 
 let currentSingleProduct = null;
 let currentBatchProducts = [];
 let selectedProductIds = new Set();
 let templates = [];
 let groups = [];
+let affiliateTags = {};
 
 // DOM Elements
 const loadingState = document.getElementById('loadingState');
@@ -14,6 +15,13 @@ const batchListingView = document.getElementById('batchListingView');
 const statusText = document.getElementById('statusText');
 const btnRetry = document.getElementById('btnRetry');
 const feedbackMessage = document.getElementById('feedbackMessage');
+const linkOpenDashboard = document.getElementById('linkOpenDashboard');
+
+// Settings Elements
+const btnSettingsToggle = document.getElementById('btnSettingsToggle');
+const settingsPanel = document.getElementById('settingsPanel');
+const inputBackendUrl = document.getElementById('inputBackendUrl');
+const btnSaveBackendUrl = document.getElementById('btnSaveBackendUrl');
 
 // Single view elements
 const productImage = document.getElementById('productImage');
@@ -53,17 +61,68 @@ function formatCurrency(val) {
   return 'R$ ' + Number(val).toFixed(2).replace('.', ',');
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+// 1. Carregar Configurações de URL do Servidor
+function loadServerConfig() {
+  return new Promise((resolve) => {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get(['backendUrl', 'affiliateTags'], (res) => {
+        if (res.backendUrl) {
+          API_BASE = res.backendUrl.replace(/\/$/, '');
+        }
+        if (res.affiliateTags) {
+          affiliateTags = res.affiliateTags;
+        }
+        inputBackendUrl.value = API_BASE;
+        linkOpenDashboard.href = API_BASE;
+        resolve();
+      });
+    } else {
+      inputBackendUrl.value = API_BASE;
+      resolve();
+    }
+  });
 }
 
-// 1. Conexão com o backend
+btnSettingsToggle.addEventListener('click', () => {
+  settingsPanel.classList.toggle('hidden');
+});
+
+btnSaveBackendUrl.addEventListener('click', async () => {
+  const newUrl = inputBackendUrl.value.trim().replace(/\/$/, '');
+  if (!newUrl) return;
+  API_BASE = newUrl;
+  linkOpenDashboard.href = API_BASE;
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.set({ backendUrl: API_BASE });
+  }
+  settingsPanel.classList.add('hidden');
+  showFeedback(`Servidor atualizado: ${API_BASE}`, 'success');
+  await checkBackendConnection();
+  await loadConfig();
+});
+
+// 2. Conexão com o backend
 async function checkBackendConnection() {
+  statusText.innerText = 'Conectando...';
   try {
     const res = await fetch(`${API_BASE}/api/extension/me`);
     const json = await res.json();
     if (json.success) {
       statusText.innerText = 'Conectado';
+      statusText.parentElement.style.background = 'rgba(34, 197, 94, 0.15)';
+      statusText.parentElement.style.color = '#22c55e';
+
+      // Atualizar tags de afiliados automaticamente
+      if (json.marketplaces) {
+        const tags = {};
+        json.marketplaces.forEach((m) => {
+          tags[m.slug] = m.affiliateTag;
+        });
+        affiliateTags = tags;
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ affiliateTags: tags });
+        }
+      }
       return true;
     }
   } catch (e) {
@@ -74,7 +133,7 @@ async function checkBackendConnection() {
   return false;
 }
 
-// 2. Carregar templates e grupos da central
+// 3. Carregar templates e grupos da central
 async function loadConfig() {
   try {
     const [tRes, gRes] = await Promise.all([
@@ -84,169 +143,114 @@ async function loadConfig() {
     const tData = await tRes.json();
     const gData = await gRes.json();
 
-    if (tData.success) {
+    if (tData.success && tData.data.length > 0) {
       templates = tData.data;
-      const opts = templates.map((t) => `<option value="${t.id}">${t.emoji} ${t.name}</option>`).join('');
+      const opts = templates.map((t) => `<option value="${t.id}">${t.emoji || '⚡'} ${t.name}</option>`).join('');
       templateSelect.innerHTML = opts;
       batchTemplateSelect.innerHTML = opts;
+    } else {
+      templateSelect.innerHTML = `<option value="">⚡ Padrão</option>`;
+      batchTemplateSelect.innerHTML = `<option value="">⚡ Padrão</option>`;
     }
 
-    if (gData.success) {
+    if (gData.success && gData.data.length > 0) {
       groups = gData.data;
       const opts = groups.map((g) => `<option value="${g.id}">${g.name}</option>`).join('');
       groupSelect.innerHTML = opts;
       batchGroupSelect.innerHTML = opts;
+    } else {
+      groupSelect.innerHTML = `<option value="">Grupo VIP Principal</option>`;
+      batchGroupSelect.innerHTML = `<option value="">Grupo VIP Principal</option>`;
     }
   } catch (e) {
-    console.error('Erro ao carregar configurações:', e);
+    console.warn('Usando templates locais');
   }
 }
 
-// 3. Extrair da aba atual
-async function extractFromCurrentTab() {
-  loadingState.classList.remove('hidden');
-  emptyState.classList.add('hidden');
-  singleProductView.classList.add('hidden');
-  batchListingView.classList.add('hidden');
-
+// 4. Injetor de código de afiliada no link
+function convertAffiliateLink(url, marketplace) {
+  if (!url) return '';
+  const mp = (marketplace || '').toLowerCase();
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab || !tab.id) {
-      showEmptyState();
-      return;
+    const u = new URL(url.startsWith('//') ? 'https:' + url : url);
+    if (mp.includes('amazon')) {
+      const tag = affiliateTags['amazon'] || 'achadosnanda-20';
+      u.searchParams.set('tag', tag);
+      u.searchParams.delete('ref');
+      return u.toString();
     }
-
-    const tabUrl = tab.url || '';
-    let scriptFile = null;
-    if (tabUrl.includes('amazon.com.br')) scriptFile = 'content/amazon-scraper.js';
-    else if (tabUrl.includes('mercadolivre.com.br') || tabUrl.includes('mercadolibre.com')) scriptFile = 'content/ml-scraper.js';
-    else if (tabUrl.includes('shopee.com.br')) scriptFile = 'content/shopee-scraper.js';
-    else if (tabUrl.includes('web.whatsapp.com')) scriptFile = 'content/whatsapp-scraper.js';
-
-    function sendExtractMessage(isRetry = false) {
-      chrome.tabs.sendMessage(tab.id, { action: 'EXTRACT_PRODUCT' }, async (response) => {
-        if (chrome.runtime.lastError || !response || !response.success || !response.data) {
-          // Se falhou e ainda não tentamos auto-injetar o script na aba
-          if (!isRetry && scriptFile && chrome.scripting) {
-            try {
-              await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                files: [scriptFile],
-              });
-              setTimeout(() => sendExtractMessage(true), 300);
-              return;
-            } catch (e) {
-              console.error('Falha ao auto-injetar script:', e);
-            }
-          }
-          showEmptyState();
-          return;
-        }
-
-        const data = response.data;
-        if (data.isListing && data.products && data.products.length > 0) {
-          renderBatchView(data);
-        } else {
-          renderSingleView(data);
-        }
-      });
+    if (mp.includes('mercado')) {
+      const tag = affiliateTags['mercado-livre'] || 'meli-achadosnanda';
+      u.searchParams.set('matt_tool', tag);
+      return u.toString();
     }
-
-    sendExtractMessage();
+    if (mp.includes('shopee')) {
+      const tag = affiliateTags['shopee'] || 'achadosdananda-20';
+      u.searchParams.set('utm_source', tag);
+      u.searchParams.set('aff_sub', tag);
+      return u.toString();
+    }
+    return url;
   } catch (err) {
-    console.error(err);
-    showEmptyState();
+    return url;
   }
 }
 
-function showEmptyState() {
-  loadingState.classList.add('hidden');
-  emptyState.classList.remove('hidden');
-  singleProductView.classList.add('hidden');
-  batchListingView.classList.add('hidden');
-}
-
-// 4. Renderizar Modo 1: Produto Único
-function renderSingleView(prod) {
-  currentSingleProduct = prod;
+// 5. Renderizar Modo 1: Produto Único
+function renderSingleView(product) {
+  currentSingleProduct = product;
   loadingState.classList.add('hidden');
   emptyState.classList.add('hidden');
   batchListingView.classList.add('hidden');
   singleProductView.classList.remove('hidden');
 
-  productImage.src = prod.imageUrl || 'https://via.placeholder.com/150';
-  productMarketplace.innerText = prod.marketplace || 'Marketplace';
-  productTitle.innerText = prod.title || 'Produto sem título';
+  productTitle.innerText = product.title;
+  productMarketplace.innerText = product.marketplace || 'Oferta';
+  productImage.src = product.imageUrl || 'https://via.placeholder.com/150';
 
-  productOrigPrice.innerText = formatCurrency(prod.originalPrice);
-  productCurrPrice.innerText = formatCurrency(prod.currentPrice);
+  const orig = product.originalPrice || product.currentPrice;
+  const curr = product.currentPrice;
+  productOrigPrice.innerText = formatCurrency(orig);
+  productCurrPrice.innerText = formatCurrency(curr);
 
-  const orig = prod.originalPrice || prod.currentPrice;
-  const curr = prod.currentPrice;
-  let discount = 0;
-  if (orig > curr && orig > 0) {
-    discount = Math.round(((orig - curr) / orig) * 100);
-  }
-
-  productDiscount.innerText = `${discount}% OFF`;
-  if (discount === 0) {
-    productOrigPrice.style.display = 'none';
+  if (orig > curr) {
+    const disc = Math.round(((orig - curr) / orig) * 100);
+    productDiscount.innerText = `${disc}% OFF`;
+    productDiscount.classList.remove('hidden');
+    productOrigPrice.classList.remove('hidden');
   } else {
-    productOrigPrice.style.display = 'inline';
+    productDiscount.classList.add('hidden');
+    productOrigPrice.classList.add('hidden');
   }
 
-  affiliateUrlInput.value = prod.affiliateUrl || prod.url;
-
-  // Se veio do WhatsApp com texto clonado, adiciona opção de manter o texto original com os links substituídos
-  if (prod.convertedText) {
-    const existingCloneOpt = templateSelect.querySelector('option[value="original_clone"]');
-    if (!existingCloneOpt) {
-      const cloneOpt = document.createElement('option');
-      cloneOpt.value = 'original_clone';
-      cloneOpt.innerText = '⚡ Texto Original (Apenas Links Substituídos)';
-      templateSelect.prepend(cloneOpt);
-    }
-    templateSelect.value = 'original_clone';
-  }
+  // Gera o link de afiliada automaticamente
+  const cleanLink = convertAffiliateLink(product.url, product.marketplace);
+  affiliateUrlInput.value = cleanLink;
 
   updateGeneratedMessage();
 }
 
 function updateGeneratedMessage() {
   if (!currentSingleProduct) return;
+  const selectedTplId = templateSelect.value;
+  const selectedTpl = templates.find((t) => t.id === selectedTplId) || templates[0] || {
+    structure: '⚡ {TITULO}\n\nDe: {PRECO_DE}\nPor apenas: {PRECO_POR}\n{DESCONTO}\n\n{FRETE}\n\n👇 VEJA AQUI:\n{LINK}',
+    cta: '👇 VEJA AQUI:',
+    footer: 'Achados da Nanda',
+  };
 
-  const link = affiliateUrlInput.value.trim() || currentSingleProduct.affiliateUrl || currentSingleProduct.url;
+  const orig = currentSingleProduct.originalPrice || currentSingleProduct.currentPrice;
+  const curr = currentSingleProduct.currentPrice;
+  const disc = orig > curr ? Math.round(((orig - curr) / orig) * 100) : 0;
+  const link = affiliateUrlInput.value.trim() || currentSingleProduct.url;
 
-  if (templateSelect.value === 'original_clone' && currentSingleProduct.convertedText) {
-    let originalWithUpdatedLink = currentSingleProduct.convertedText;
-    if (currentSingleProduct.affiliateUrl && link !== currentSingleProduct.affiliateUrl) {
-      originalWithUpdatedLink = originalWithUpdatedLink.replace(currentSingleProduct.affiliateUrl, link);
-    }
-    whatsappPreview.innerText = originalWithUpdatedLink.trim();
-    return;
-  }
-
-  const selectedTpl = templates.find((t) => t.id === templateSelect.value) || templates[0];
-  if (!selectedTpl) {
-    whatsappPreview.innerText = `🔥 ${currentSingleProduct.title}\nPor: ${formatCurrency(currentSingleProduct.currentPrice)}\n${link}`;
-    return;
-  }
-
-  const precoDe = currentSingleProduct.originalPrice > currentSingleProduct.currentPrice
-    ? `De: ~${formatCurrency(currentSingleProduct.originalPrice)}~`
-    : '';
-  const precoPor = `Por apenas: *${formatCurrency(currentSingleProduct.currentPrice)}*`;
-  const desc = currentSingleProduct.originalPrice > currentSingleProduct.currentPrice
-    ? `${Math.round(((currentSingleProduct.originalPrice - currentSingleProduct.currentPrice) / currentSingleProduct.originalPrice) * 100)}% OFF`
-    : '';
-
-  let text = selectedTpl.structure;
+  let text = selectedTpl.structure || '';
   text = text.replace(/{TITULO}/g, currentSingleProduct.title);
-  text = text.replace(/{PRECO_DE}/g, precoDe);
-  text = text.replace(/{PRECO_POR}/g, precoPor);
-  text = text.replace(/{DESCONTO}/g, desc);
-  text = text.replace(/{VALOR_ECONOMIZADO}/g, formatCurrency(currentSingleProduct.originalPrice - currentSingleProduct.currentPrice));
-  text = text.replace(/{CUPOM}/g, currentSingleProduct.coupon ? `Cupom: *${currentSingleProduct.coupon}*` : '');
+  text = text.replace(/{PRECO_DE}/g, orig > curr ? `De: ~${formatCurrency(orig)}~` : '');
+  text = text.replace(/{PRECO_POR}/g, formatCurrency(curr));
+  text = text.replace(/{DESCONTO}/g, disc > 0 ? `${disc}% OFF` : '');
+  text = text.replace(/{VALOR_ECONOMIZADO}/g, orig > curr ? formatCurrency(orig - curr) : '');
+  text = text.replace(/{CUPOM}/g, currentSingleProduct.coupon ? `Cupom: ${currentSingleProduct.coupon}` : '');
   text = text.replace(/{FRETE}/g, currentSingleProduct.shippingInfo || 'Frete Grátis');
   text = text.replace(/{LINK}/g, link);
   text = text.replace(/{CTA}/g, selectedTpl.cta || '👇 COMPRE AQUI:');
@@ -258,17 +262,17 @@ function updateGeneratedMessage() {
 templateSelect.addEventListener('change', updateGeneratedMessage);
 affiliateUrlInput.addEventListener('input', updateGeneratedMessage);
 
-// 5. Renderizar Modo 2: Lote / Vitrine de Ofertas
+// 6. Renderizar Modo 2: Lote / Auto-Scroll Harvester
 function renderBatchView(data) {
   currentBatchProducts = data.products;
-  selectedProductIds = new Set(data.products.map((p) => p.id)); // seleciona todos por padrão
+  selectedProductIds = new Set(data.products.map((p) => p.id));
 
   loadingState.classList.add('hidden');
   emptyState.classList.add('hidden');
   singleProductView.classList.add('hidden');
   batchListingView.classList.remove('hidden');
 
-  batchTitle.innerText = `${data.totalFound} Ofertas no ${data.marketplace}`;
+  batchTitle.innerText = `${data.totalFound} Ofertas no ${data.marketplace || 'Site'}`;
 
   renderBatchProductCards();
   updateBatchCounters();
@@ -293,13 +297,13 @@ function renderBatchProductCards() {
               ${orig > curr ? `<span class="batch-item-old">${formatCurrency(orig)}</span>` : ''}
               ${disc > 0 ? `<span class="batch-item-disc">${disc}% OFF</span>` : ''}
             </div>
+            <div style="font-size: 10px; color: #10b981; margin-top: 2px;">✓ Link de Afiliada Ativo</div>
           </div>
         </div>
       `;
     })
     .join('');
 
-  // Adicionar listeners de clique nos cards e checkboxes
   batchProductsList.querySelectorAll('.batch-item').forEach((item) => {
     item.addEventListener('click', (e) => {
       const id = item.dataset.id;
@@ -329,7 +333,11 @@ function updateBatchCounters() {
   btnBatchSaveRadar.disabled = count === 0;
 }
 
-// Quick filter chips
+function updateFilterChipActive(activeBtn) {
+  [btnSelectAll, btnSelect40, btnSelect50, btnDeselectAll].forEach((b) => b.classList.remove('active'));
+  activeBtn.classList.add('active');
+}
+
 btnSelectAll.addEventListener('click', () => {
   selectedProductIds = new Set(currentBatchProducts.map((p) => p.id));
   updateFilterChipActive(btnSelectAll);
@@ -362,76 +370,68 @@ btnDeselectAll.addEventListener('click', () => {
   updateBatchCounters();
 });
 
-function updateFilterChipActive(activeBtn) {
-  [btnSelectAll, btnSelect40, btnSelect50, btnDeselectAll].forEach((b) => b.classList.remove('active'));
-  activeBtn.classList.add('active');
-}
-
-// 6. Envio em Lote 100% Seguro (Anti-Ban com Jitter Progressivo)
+// 7. Envio em Lote Super Rápido (Single Batch POST)
 async function sendBatchOffers(action) {
-  const selectedItems = currentBatchProducts.filter((p) => selectedProductIds.has(p.id));
-  if (selectedItems.length === 0) return;
+  const selectedList = currentBatchProducts.filter((p) => selectedProductIds.has(p.id));
+  if (selectedList.length === 0) return;
 
   btnBatchAddToQueue.disabled = true;
   btnBatchSaveRadar.disabled = true;
   batchProgressContainer.classList.remove('hidden');
+  batchProgressBar.style.width = '50%';
+  batchProgressText.innerText = `Enviando ${selectedList.length} ofertas para ${action === 'QUEUE' ? 'a Fila' : 'o Radar'}...`;
 
-  let successCount = 0;
-  const total = selectedItems.length;
+  try {
+    const payloadItems = selectedList.map((prod) => ({
+      title: prod.title,
+      originalPrice: prod.originalPrice,
+      currentPrice: prod.currentPrice,
+      imageUrl: prod.imageUrl,
+      url: prod.url || prod.originalUrl,
+      affiliateUrl: prod.affiliateUrl || convertAffiliateLink(prod.url || prod.originalUrl, prod.marketplace),
+      marketplace: prod.marketplace,
+      coupon: prod.coupon,
+      shippingInfo: prod.shippingInfo,
+      action,
+    }));
 
-  for (let i = 0; i < total; i++) {
-    const item = selectedItems[i];
-    const progress = Math.round(((i + 1) / total) * 100);
-    batchProgressBar.style.width = `${progress}%`;
-    batchProgressText.innerText = `Processando com segurança: ${i + 1} de ${total}...`;
-
-    try {
-      const payload = {
-        title: item.title,
-        originalPrice: item.originalPrice,
-        currentPrice: item.currentPrice,
-        imageUrl: item.imageUrl,
-        url: item.url,
-        affiliateUrl: item.url,
-        marketplace: item.marketplace,
-        coupon: null,
-        shippingInfo: item.shippingInfo,
-        action: action, // QUEUE ou RADAR
-        templateId: batchTemplateSelect.value,
+    const res = await fetch(`${API_BASE}/api/extension/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: payloadItems,
+        action,
+        templateId: batchTemplateSelect.value || undefined,
         groupIds: batchGroupSelect.value ? [batchGroupSelect.value] : [],
-      };
+      }),
+    });
 
-      const res = await fetch(`${API_BASE}/api/extension/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+    batchProgressBar.style.width = '100%';
 
-      if (res.ok) successCount++;
-    } catch (err) {
-      console.error(err);
+    const json = await res.json();
+    if (json.success) {
+      showFeedback(
+        action === 'QUEUE'
+          ? `⚡ ${json.count || selectedList.length} ofertas adicionadas à Fila com sucesso!`
+          : `🔥 ${json.count || selectedList.length} ofertas salvas no Radar!`,
+        'success'
+      );
+    } else {
+      showFeedback(`Erro ao salvar: ${json.error || 'Falha no servidor'}`, 'error');
     }
-
-    // Intervalo de segurança anti-ban / anti-trava (250ms a 400ms)
-    await sleep(250 + Math.random() * 150);
+  } catch (err) {
+    showFeedback('Falha de conexão com o servidor.', 'error');
+  } finally {
+    batchProgressContainer.classList.add('hidden');
+    btnBatchAddToQueue.disabled = false;
+    btnBatchSaveRadar.disabled = false;
   }
-
-  batchProgressContainer.classList.add('hidden');
-  btnBatchAddToQueue.disabled = false;
-  btnBatchSaveRadar.disabled = false;
-
-  showFeedback(
-    action === 'QUEUE'
-      ? `⚡ ${successCount} ofertas adicionadas à Fila com sucesso!`
-      : `🔥 ${successCount} ofertas salvas no Radar!`,
-    'success'
-  );
 }
 
 btnBatchAddToQueue.addEventListener('click', () => sendBatchOffers('QUEUE'));
 btnBatchSaveRadar.addEventListener('click', () => sendBatchOffers('RADAR'));
 
-// Ações no modo único
+// 8. Envio de Oferta Única
 btnAddToQueue.addEventListener('click', async () => {
   if (!currentSingleProduct) return;
   showFeedback('Enviando para a Fila...', 'info');
@@ -447,7 +447,7 @@ btnAddToQueue.addEventListener('click', async () => {
       marketplace: currentSingleProduct.marketplace,
       coupon: currentSingleProduct.coupon,
       action: 'QUEUE',
-      templateId: templateSelect.value,
+      templateId: templateSelect.value || undefined,
       groupIds: groupSelect.value ? [groupSelect.value] : [],
     };
 
@@ -492,6 +492,8 @@ btnSaveRadar.addEventListener('click', async () => {
 
     if (res.ok) {
       showFeedback('🔥 Salva no Radar com sucesso!', 'success');
+    } else {
+      showFeedback('Erro ao salvar.', 'error');
     }
   } catch (err) {
     showFeedback('Falha de conexão.', 'error');
@@ -518,8 +520,64 @@ function showFeedback(msg, type) {
   setTimeout(() => feedbackMessage.classList.add('hidden'), 4000);
 }
 
+// 9. Extração da Aba Ativa (Prioriza colheita ao rolar)
+async function extractFromCurrentTab() {
+  loadingState.classList.remove('hidden');
+  emptyState.classList.add('hidden');
+  singleProductView.classList.add('hidden');
+  batchListingView.classList.add('hidden');
+
+  if (typeof chrome === 'undefined' || !chrome.tabs) {
+    loadingState.classList.add('hidden');
+    emptyState.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.id) {
+      loadingState.classList.add('hidden');
+      emptyState.classList.remove('hidden');
+      return;
+    }
+
+    // Primeiro tenta buscar ofertas colhidas pelo Auto-Scroll Harvester
+    chrome.tabs.sendMessage(tab.id, { action: 'GET_HARVESTED_OFFERS' }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.success || !response.offers || response.offers.length === 0) {
+        // Fallback: extração padrão pontual
+        chrome.tabs.sendMessage(tab.id, { action: 'EXTRACT_PRODUCT' }, (fallbackRes) => {
+          loadingState.classList.add('hidden');
+          if (chrome.runtime.lastError || !fallbackRes || !fallbackRes.success) {
+            emptyState.classList.remove('hidden');
+            return;
+          }
+
+          if (fallbackRes.data.isListing) {
+            renderBatchView(fallbackRes.data);
+          } else {
+            renderSingleView(fallbackRes.data);
+          }
+        });
+        return;
+      }
+
+      // Se encontrou ofertas colhidas
+      loadingState.classList.add('hidden');
+      renderBatchView({
+        totalFound: response.offers.length,
+        marketplace: response.marketplace,
+        products: response.offers,
+      });
+    });
+  } catch (err) {
+    loadingState.classList.add('hidden');
+    emptyState.classList.remove('hidden');
+  }
+}
+
 // Inicialização
 (async function init() {
+  await loadServerConfig();
   await checkBackendConnection();
   await loadConfig();
   await extractFromCurrentTab();

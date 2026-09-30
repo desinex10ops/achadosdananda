@@ -9,6 +9,8 @@
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
+    "db:local": "node scripts/switch-db.js sqlite",
+    "db:supabase": "node scripts/switch-db.js supabase",
     "postinstall": "prisma generate"
   },
   "dependencies": {

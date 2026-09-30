@@ -16,7 +16,8 @@
     "https://*.shopee.com.br/*",
     "https://*.amazon.com.br/*",
     "https://web.whatsapp.com/*",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://*.vercel.app/*"
   ],
   "background": {
     "service_worker": "background/service-worker.js"
@@ -35,21 +36,21 @@
         "https://*.mercadolivre.com.br/*",
         "https://*.mercadolibre.com/*"
       ],
-      "js": ["content/ml-scraper.js"],
+      "js": ["content/ml-scraper.js", "content/harvester-overlay.js"],
       "run_at": "document_idle"
     },
     {
       "matches": [
         "https://*.shopee.com.br/*"
       ],
-      "js": ["content/shopee-scraper.js"],
+      "js": ["content/shopee-scraper.js", "content/harvester-overlay.js"],
       "run_at": "document_idle"
     },
     {
       "matches": [
         "https://*.amazon.com.br/*"
       ],
-      "js": ["content/amazon-scraper.js"],
+      "js": ["content/amazon-scraper.js", "content/harvester-overlay.js"],
       "run_at": "document_idle"
     },
     {

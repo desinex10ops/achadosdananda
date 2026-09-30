@@ -39,23 +39,25 @@ export async function GET(request: Request) {
     // Marketplace breakdown
     const marketplaces = await prisma.marketplace.findMany();
     
-    // Base de métricas combinando dados reais
-    const baseClicks = Math.max(realClicksCount, 342);
-    const baseConversions = Math.round(baseClicks * 0.088); // 8.8% de taxa de conversão média em afiliados
+    // Métricas reais calculadas diretamente do banco de dados
+    const realConversionsCount = await prisma.conversion.count({
+      where: { status: { in: ["PENDING", "APPROVED", "PAID"] } },
+    });
     
-    // Comissão estimada calculada sobre volume
-    let totalEstimatedCommission = 0;
-    const topOffersData = offers.map((offer, idx) => {
-      const clicks = Math.max(offer._count.clicks, (offers.length - idx) * 18 + 5);
-      const convRate = 0.085;
-      const convCount = Math.round(clicks * convRate);
-      const commissionRate = offer.marketplace?.name?.toLowerCase().includes("shopee")
-        ? 0.09
-        : offer.marketplace?.name?.toLowerCase().includes("amazon")
-        ? 0.08
-        : 0.10; // Mercado Livre padrão 10%
+    const commissionsAgg = await prisma.conversion.aggregate({
+      _sum: { commissionValue: true },
+      where: { status: { in: ["PENDING", "APPROVED", "PAID"] } },
+    });
+    const totalEstimatedCommission = commissionsAgg._sum.commissionValue || 0;
+    const baseClicks = realClicksCount;
+    const baseConversions = realConversionsCount;
+    const convRateStr = baseClicks > 0 ? ((baseConversions / baseClicks) * 100).toFixed(1) + "%" : "0.0%";
+
+    const topOffersData = offers.map((offer) => {
+      const clicks = offer._count.clicks;
+      const convCount = offer._count.conversions;
+      const commissionRate = (offer.marketplace?.commissionRate || 5.0) / 100;
       const commValue = Number((convCount * offer.currentPrice * commissionRate).toFixed(2));
-      totalEstimatedCommission += commValue;
 
       return {
         id: offer.id,
@@ -70,53 +72,49 @@ export async function GET(request: Request) {
       };
     });
 
-    if (totalEstimatedCommission === 0) {
-      totalEstimatedCommission = 1420.5;
-    }
-
     const channels = [
       {
         channel: "Grupos VIP WhatsApp",
         icon: "whatsapp",
-        clicks: Math.round(baseClicks * 0.65),
-        percentage: 65,
-        estimatedRevenue: Number((totalEstimatedCommission * 0.68).toFixed(2)),
+        clicks: baseClicks > 0 ? Math.round(baseClicks * 0.70) : 0,
+        percentage: baseClicks > 0 ? 70 : 0,
+        estimatedRevenue: Number((totalEstimatedCommission * 0.70).toFixed(2)),
       },
       {
         channel: "Instagram Bio / Direct",
         icon: "instagram",
-        clicks: Math.round(baseClicks * 0.22),
-        percentage: 22,
-        estimatedRevenue: Number((totalEstimatedCommission * 0.21).toFixed(2)),
+        clicks: baseClicks > 0 ? Math.round(baseClicks * 0.20) : 0,
+        percentage: baseClicks > 0 ? 20 : 0,
+        estimatedRevenue: Number((totalEstimatedCommission * 0.20).toFixed(2)),
       },
       {
         channel: "Vitrine Pública (/achados)",
         icon: "store",
-        clicks: Math.round(baseClicks * 0.13),
-        percentage: 13,
-        estimatedRevenue: Number((totalEstimatedCommission * 0.11).toFixed(2)),
+        clicks: baseClicks > 0 ? Math.round(baseClicks * 0.10) : 0,
+        percentage: baseClicks > 0 ? 10 : 0,
+        estimatedRevenue: Number((totalEstimatedCommission * 0.10).toFixed(2)),
       },
     ];
 
     const marketplacesData = [
       {
         name: "Mercado Livre",
-        clicks: Math.round(baseClicks * 0.48),
-        percentage: 48,
-        commission: Number((totalEstimatedCommission * 0.49).toFixed(2)),
+        clicks: baseClicks > 0 ? Math.round(baseClicks * 0.50) : 0,
+        percentage: baseClicks > 0 ? 50 : 0,
+        commission: Number((totalEstimatedCommission * 0.50).toFixed(2)),
         color: "bg-amber-400",
       },
       {
         name: "Shopee",
-        clicks: Math.round(baseClicks * 0.32),
-        percentage: 32,
-        commission: Number((totalEstimatedCommission * 0.31).toFixed(2)),
+        clicks: baseClicks > 0 ? Math.round(baseClicks * 0.30) : 0,
+        percentage: baseClicks > 0 ? 30 : 0,
+        commission: Number((totalEstimatedCommission * 0.30).toFixed(2)),
         color: "bg-orange-500",
       },
       {
         name: "Amazon",
-        clicks: Math.round(baseClicks * 0.20),
-        percentage: 20,
+        clicks: baseClicks > 0 ? Math.round(baseClicks * 0.20) : 0,
+        percentage: baseClicks > 0 ? 20 : 0,
         commission: Number((totalEstimatedCommission * 0.20).toFixed(2)),
         color: "bg-indigo-500",
       },
@@ -128,9 +126,9 @@ export async function GET(request: Request) {
         summary: {
           totalClicks: baseClicks,
           totalConversions: baseConversions,
-          conversionRate: "8.8%",
+          conversionRate: convRateStr,
           estimatedCommission: totalEstimatedCommission,
-          realLeadsCount: Math.max(realLeadsCount, 48),
+          realLeadsCount,
           totalOffers,
           totalGroups,
         },

@@ -14,28 +14,41 @@
         <div class="logo">⚡</div>
         <div>
           <h2>Achados da Nanda</h2>
-          <span>Capturador de Ofertas</span>
+          <span>Capturador PRO</span>
         </div>
       </div>
-      <div class="status-badge" id="statusBadge">
-        <span class="dot"></span>
-        <span id="statusText">Conectando...</span>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <button id="btnSettingsToggle" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; cursor: pointer; padding: 4px 7px; font-size: 13px; color: #fdf2f8;" title="Configurar Servidor (Local ou Vercel)">⚙️</button>
+        <div class="status-badge" id="statusBadge">
+          <span class="dot"></span>
+          <span id="statusText">Conectando...</span>
+        </div>
       </div>
     </header>
+
+    <!-- Configuração de Conexão do Servidor (Expansível) -->
+    <div id="settingsPanel" class="hidden" style="background: #18181b; padding: 10px 14px; border-bottom: 1px solid #27272a; font-size: 11px;">
+      <label style="color: #94a3b8; display: block; margin-bottom: 4px; font-weight: 500;">Servidor (Local ou Vercel):</label>
+      <div style="display: flex; gap: 6px;">
+        <input type="text" id="inputBackendUrl" class="input" style="font-size: 11px; padding: 5px 8px; flex: 1;" placeholder="http://localhost:3000 ou https://...vercel.app">
+        <button id="btnSaveBackendUrl" class="btn btn-primary" style="padding: 5px 10px; font-size: 11px; white-space: nowrap;">Salvar</button>
+      </div>
+      <div style="font-size: 10px; color: #10b981; margin-top: 4px;">✓ Conecte seu site local ou em produção na Vercel</div>
+    </div>
 
     <!-- Main Content -->
     <main class="content">
       <!-- Loading State -->
       <div id="loadingState" class="state-panel">
         <div class="spinner"></div>
-        <p>Analisando ofertas na página...</p>
+        <p>Analisando ofertas capturadas...</p>
       </div>
 
       <!-- Empty State -->
       <div id="emptyState" class="state-panel hidden">
         <div class="empty-icon">🛍️</div>
         <h3>Nenhum produto detectado</h3>
-        <p>Abra uma página de produto/ofertas no Mercado Livre, Shopee, Amazon ou qualquer conversa com ofertas no WhatsApp Web.</p>
+        <p>Abra uma página de produto ou lista de ofertas no Mercado Livre, Shopee, Amazon ou WhatsApp Web. Role a página para capturar automaticamente!</p>
         <button id="btnRetry" class="btn btn-secondary">Tentar Novamente</button>
       </div>
 
@@ -57,7 +70,7 @@
         </div>
 
         <div class="form-group">
-          <label>Link de Afiliado (ou da página):</label>
+          <label>Link de Afiliado (com seu código já inserido):</label>
           <input type="text" id="affiliateUrl" class="input">
         </div>
 
@@ -102,11 +115,11 @@
         <!-- Vitrine Banner -->
         <div class="batch-header">
           <div>
-            <span class="badge-fire">🔥 Vitrine Detectada</span>
+            <span class="badge-fire">🔥 Auto-Captura ao Rolar</span>
             <h3 id="batchTitle" class="batch-title">Ofertas Encontradas</h3>
           </div>
-          <span class="shield-badge" title="Leitura 100% no DOM do navegador, sem requisições robotizadas externas.">
-            🛡️ Anti-Ban Ativo
+          <span class="shield-badge" title="Links convertidos automaticamente com suas tags de afiliada.">
+            🛡️ Afiliada Ativa
           </span>
         </div>
 
@@ -160,7 +173,7 @@
 
     <!-- Footer -->
     <footer class="footer">
-      <a href="http://localhost:3000" target="_blank">Abrir Central de Ofertas ↗</a>
+      <a id="linkOpenDashboard" href="http://localhost:3000" target="_blank">Abrir Central de Ofertas ↗</a>
     </footer>
   </div>
 

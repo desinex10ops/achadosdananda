@@ -198,9 +198,23 @@ export default function AchadosVitrinePage() {
             </div>
           ) : offers.length === 0 ? (
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-10 text-center space-y-3">
-              <ShoppingBag className="w-10 h-10 text-slate-600 mx-auto" />
-              <h3 className="text-base font-bold text-white">Nenhum produto encontrado</h3>
-              <p className="text-xs text-slate-400">Tente buscar por outro termo ou selecione outra categoria.</p>
+              <ShoppingBag className="w-10 h-10 text-pink-500/50 mx-auto" />
+              <h3 className="text-base font-bold text-white">
+                {search ? "Nenhum produto encontrado" : "Novos achadinhos sendo preparados!"}
+              </h3>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                {search
+                  ? "Tente buscar por outro termo ou selecione outra categoria."
+                  : "Estamos garimpando as melhores ofertas do dia. Entre no nosso Grupo VIP no WhatsApp para receber em primeira mão!"}
+              </p>
+              {!search && (
+                <Link
+                  href="/vip"
+                  className="inline-flex items-center gap-2 mt-2 px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition"
+                >
+                  Entrar no Grupo VIP do WhatsApp 💬
+                </Link>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
