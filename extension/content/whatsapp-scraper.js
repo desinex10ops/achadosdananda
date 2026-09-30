@@ -1,13 +1,14 @@
 // =======================================================================
-// ACHADOS DA NANDA PRO - CLONADOR UNIVERSAL PARA WHATSAPP WEB (V6)
-// Com Smart Message Stitcher (fusão inteligente de foto+texto com link)
-// e Injeção Automática de Códigos de Afiliada (Mercado Livre, Shopee, Amazon)
+// ACHADOS DA NANDA PRO - CLONADOR UNIVERSAL PARA WHATSAPP WEB (V7)
+// Com Super Extrator Robusto de Preços e Títulos (suporta markdown do Wpp)
+// Smart Message Stitcher (fusão foto + texto + link)
+// e Auto-Scroll Harvester (Puxa todas as ofertas enviadas durante o dia)
 // =======================================================================
 
 (function () {
   'use strict';
 
-  console.log('[Achados da Nanda PRO] Clonador WhatsApp Web v6 inicializado.');
+  console.log('[Achados da Nanda PRO] Clonador WhatsApp Web v7 inicializado.');
 
   let affiliateTags = {
     amazon: 'achadosnanda-20',
@@ -15,6 +16,9 @@
     mercadolivre: 'meli-achadosnanda',
     magalu: 'magalu-nanda',
   };
+
+  // Cache acumulativo de ofertas da sessão do dia
+  const harvestedOffersCache = new Map();
 
   // Carrega tags salvas no storage da extensão
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
@@ -109,12 +113,18 @@
     });
   }
 
-  // 4. Extrai preços (De / Por) do texto
+  // 4. Extrator Robusto de Preços (Elimina markdown do WhatsApp, trata espaços unicode e De/Por)
   function extractPricesFromText(text) {
     if (!text) return { currentPrice: 0, originalPrice: 0 };
 
-    const porMatch = text.match(/(?:por|por\s*apenas|valor|por:)\s*[:]?\s*R\$\s*([\d.]+,\d{2}|\d+)/i);
-    const deMatch = text.match(/(?:de|de:)\s*[:]?\s*R\$\s*([\d.]+,\d{2}|\d+)/i);
+    // Normaliza espaços unicode e limpa markdown do WhatsApp (*, ~, _, `)
+    const clean = text
+      .replace(/[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/g, ' ')
+      .replace(/[*_~`]/g, '');
+
+    // Busca padrão De / Por explícito
+    const porMatch = clean.match(/(?:por|por\s*apenas|valor|por:|preço|preco|pagando|sai\s*por|apenas)\s*[:]?\s*R\$\s*([\d.]+,\d{2}|\d+)/i);
+    const deMatch = clean.match(/(?:de|de:|antes|era)\s*[:]?\s*R\$\s*([\d.]+,\d{2}|\d+)/i);
 
     let currentPrice = porMatch ? parseFloat(porMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
     let originalPrice = deMatch ? parseFloat(deMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
@@ -124,27 +134,26 @@
       return { currentPrice, originalPrice };
     }
 
-    // Fallback: procura todos os valores com R$ no texto
-    const priceMatches = Array.from(text.matchAll(/R\$\s*([\d.]+,\d{2}|\d+)/gi));
-    if (priceMatches.length === 0) {
-      return { currentPrice: 0, originalPrice: 0 };
-    }
-
-    const prices = priceMatches
+    // Procura qualquer ocorrência de "R$ valor"
+    const allPrices = Array.from(clean.matchAll(/R\$\s*([\d.]+,\d{2}|\d+)/gi))
       .map(m => parseFloat(m[1].replace(/\./g, '').replace(',', '.')) || 0)
       .filter(p => p > 0);
 
-    if (prices.length === 1) {
-      return { currentPrice: prices[0], originalPrice: prices[0] };
+    if (allPrices.length === 1) {
+      return { currentPrice: allPrices[0], originalPrice: allPrices[0] };
+    } else if (allPrices.length > 1) {
+      allPrices.sort((a, b) => b - a);
+      return { originalPrice: allPrices[0], currentPrice: allPrices[allPrices.length - 1] };
     }
-    prices.sort((a, b) => b - a);
-    return { originalPrice: prices[0], currentPrice: prices[prices.length - 1] };
+
+    return { currentPrice: 0, originalPrice: 0 };
   }
 
   // 5. Extrai código de cupom
   function extractCouponFromText(text) {
     if (!text) return null;
-    const match = text.match(/(?:cupom|cupom\s*:|use\s*:|c[oó]digo\s*:)\s*([A-Z0-9_\-]+)/i);
+    const clean = text.replace(/[*_~`]/g, '');
+    const match = clean.match(/(?:cupom|cupom\s*:|use\s*:|c[oó]digo\s*:)\s*([A-Z0-9_\-]+)/i);
     return match ? match[1].trim().toUpperCase() : null;
   }
 
@@ -160,29 +169,47 @@
     return converted;
   }
 
-  // 7. Extrai título limpo das linhas da mensagem
+  // 7. Extrator Robusto de Título
   function extractProductTitle(rawText) {
-    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-    const candidateLines = lines.filter(l => {
-      const low = l.toLowerCase();
+    if (!rawText) return 'Achado Promocional';
+
+    const clean = rawText
+      .replace(/[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/g, ' ')
+      .replace(/[*_~`]/g, '');
+
+    // Divide por quebra de linha
+    let chunks = clean.split(/\n+/).map(c => c.trim()).filter(Boolean);
+
+    // Se veio tudo em uma linha só, tenta quebrar antes dos divisores promocionais
+    if (chunks.length <= 1) {
+      const single = chunks[0] || clean;
+      chunks = single
+        .split(/(?:De:\s*R\$|Por:\s*R\$|Cupom:|🎟️|Compre aqui:|🔗|https?:\/\/)/i)
+        .map(c => c.trim())
+        .filter(Boolean);
+    }
+
+    const candidates = chunks.filter(c => {
+      const low = c.toLowerCase();
       if (low.startsWith('http') || low.includes('meli.la') || low.includes('shope.ee') || low.includes('amzn.to')) return false;
       if (low.includes('de:') || low.includes('por:') || low.includes('cupom:') || low.includes('compre aqui')) return false;
-      if (low.includes('link:') || low.includes('r$')) return false;
-      return l.length > 5;
+      if (low.includes('link:')) return false;
+      if (/^r\$\s*[\d.,]+/i.test(c)) return false;
+      return c.length > 5;
     });
 
-    if (candidateLines.length === 0) return 'Achado Promocional';
+    if (candidates.length === 0) return 'Achado Promocional';
 
-    let chosen = candidateLines.length > 1 && candidateLines[0].length < candidateLines[1].length
-      ? candidateLines[1]
-      : candidateLines[0];
+    let chosen = candidates.length > 1 && candidates[0].length < candidates[1].length
+      ? candidates[1]
+      : candidates[0];
 
     chosen = chosen.replace(/^[🚨🔥⚡💥👇📢👀✨🛍️📦👉💛💖💅👑]+\s*/, '').trim();
     if (chosen.length > 95) chosen = chosen.substring(0, 95) + '...';
     return chosen;
   }
 
-  // 8. Tenta converter imagem de produto em base64 seguro para evitar bloqueio de blob pelo Chrome
+  // 8. Extrai imagem do nó e converte em base64 (Canvas)
   function getBase64Image(node) {
     if (!node) return '';
     const img = node.querySelector('img[src*="blob:"], img[src*="http"], div[data-testid="image-thumb"] img, img');
@@ -199,22 +226,32 @@
       }
     } catch (e) {}
 
-    // Se falhar canvas e for blob, não retorna o blob diretamente para evitar CSP error no popup
     if (img.src && !img.src.startsWith('blob:')) {
       return img.src;
     }
     return '';
   }
 
-  // 9. Verifica se o elemento está no chat principal (fora da lista de contatos #side)
+  // 9. Extrai o texto completo de uma mensagem do WhatsApp lendo todos os spans internos
+  function getNodeFullText(node) {
+    if (!node) return '';
+    const spans = Array.from(node.querySelectorAll('.copyable-text, .selectable-text, span[dir="ltr"], span._ao3e, p'));
+    let textFromSpans = '';
+    if (spans.length > 0) {
+      textFromSpans = spans.map(s => s.innerText || s.textContent || '').filter(Boolean).join('\n');
+    }
+    const inner = (node.innerText || node.textContent || '').trim();
+    return textFromSpans.length >= inner.length ? textFromSpans : inner;
+  }
+
+  // 10. Filtro para garantir nós dentro da conversa aberta (ignora o menu lateral #side)
   function isInsideChat(el) {
     if (!el) return false;
     return !el.closest('#side') && !el.closest('header') && !el.closest('div[data-testid="chat-list"]');
   }
 
-  // 10. Coleta todos os nós de mensagem ordenados do chat central
+  // 11. Coleta os nós de mensagens do chat ativo
   function getChatMsgElements() {
-    // Procura nós de mensagem do WhatsApp Web
     const candidates = Array.from(document.querySelectorAll(
       'div[data-id], div[role="row"], div.message-in, div.message-out, div[data-testid="msg-container"]'
     )).filter(isInsideChat);
@@ -233,52 +270,53 @@
     return uniqueNodes;
   }
 
-  // 11. Extração Inteligente com Smart Message Stitcher (une foto+texto com o link da mensagem adjacente)
+  // 12. Extração Inteligente com Smart Message Stitcher e Acúmulo no Cache
   function extractAllChatOffers() {
     const nodes = getChatMsgElements();
-    const seenUrls = new Set();
-    const offers = [];
 
     // Mapeia todas as mensagens com seus textos e imagens
     const msgList = nodes.map((node, index) => {
-      const text = (node.innerText || '').trim();
+      const text = getNodeFullText(node);
       const urls = extractUrlsFromText(text);
       const img = getBase64Image(node);
       return { node, index, text, urls, img };
     });
 
-    // Itera pelas mensagens procurando links
     for (let i = 0; i < msgList.length; i++) {
       const current = msgList[i];
       if (current.urls.length === 0) continue;
 
       const rawUrl = current.urls[0];
       const cleanBase = rawUrl.split('?')[0];
-      if (seenUrls.has(cleanBase)) continue;
 
       let combinedText = current.text;
       let combinedImage = current.img;
 
-      // Smart Stitcher: Se a mensagem atual não tem preço ou tem texto curto (ex: só "Compre aqui: link")
-      // Procura nas mensagens imediatamente anteriores (até 2 mensagens antes)
+      // Smart Stitcher: Se a mensagem do link for curta ou não tiver preço
+      // Procura nas mensagens anteriores (até 3 mensagens antes)
       const currentPrices = extractPricesFromText(combinedText);
       if (currentPrices.currentPrice === 0 || combinedText.length < 50) {
-        for (let back = 1; back <= 2; back++) {
+        for (let back = 1; back <= 3; back++) {
           const prev = msgList[i - back];
-          if (prev && prev.text && prev.urls.length === 0) {
-            // A mensagem anterior tem texto rico (título, preço, cupom)
+          if (prev && prev.text && prev.text.length > 10) {
             combinedText = prev.text + '\n' + combinedText;
             if (!combinedImage && prev.img) {
               combinedImage = prev.img;
             }
-            break;
+            // Se já achou preço na mensagem anterior, para a busca
+            if (extractPricesFromText(combinedText).currentPrice > 0) break;
           }
         }
       }
 
-      // Se ainda não achou imagem, tenta olhar a mensagem anterior por uma foto
-      if (!combinedImage && i > 0 && msgList[i - 1].img) {
-        combinedImage = msgList[i - 1].img;
+      // Se ainda não tem imagem, vasculha os vizinhos imediatos
+      if (!combinedImage) {
+        for (let back = 1; back <= 2; back++) {
+          if (i - back >= 0 && msgList[i - back].img) {
+            combinedImage = msgList[i - back].img;
+            break;
+          }
+        }
       }
 
       const { currentPrice, originalPrice } = extractPricesFromText(combinedText);
@@ -289,10 +327,8 @@
       const disc = originalPrice > currentPrice ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0;
       const convertedText = cloneAndConvertMessageText(combinedText);
 
-      seenUrls.add(cleanBase);
-
-      offers.push({
-        id: `wpp_${i}_${Date.now()}`,
+      const offerObj = {
+        id: `wpp_${cleanBase.replace(/[^a-zA-Z0-9]/g, '_')}`,
         isListing: false,
         marketplace,
         title,
@@ -306,13 +342,64 @@
         shippingInfo: 'Verificar no link',
         rawText: combinedText,
         convertedText,
-      });
+      };
+
+      // Guarda no cache acumulativo
+      harvestedOffersCache.set(cleanBase, offerObj);
     }
 
-    return offers;
+    return Array.from(harvestedOffersCache.values());
   }
 
-  // 12. Notificação Toast visual no WhatsApp Web
+  // 13. Localiza o container rolável de mensagens do chat ativo
+  function getChatScrollContainer() {
+    const main = document.querySelector('#main') || document.querySelector('div[role="region"]');
+    if (!main) return null;
+
+    const list = [
+      main.querySelector('div[tabindex="-1"]'),
+      main.querySelector('div[data-testid="conversation-panel-wrapper"]'),
+      ...Array.from(main.querySelectorAll('div')).filter(el => {
+        const style = window.getComputedStyle(el);
+        return (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
+      })
+    ];
+
+    return list.find(Boolean) || main;
+  }
+
+  // 14. Auto-Scroll Harvester: Rola o chat suavemente para cima para puxar todas as ofertas enviadas durante o dia
+  async function autoScrollAndHarvestAllDay(onProgress) {
+    const scrollBox = getChatScrollContainer();
+    if (!scrollBox) {
+      return extractAllChatOffers();
+    }
+
+    showToast('📜 <b>Puxando ofertas do dia...</b> Rolando histórico de mensagens.');
+
+    const originalScrollTop = scrollBox.scrollTop;
+    const steps = 15; // 15 etapas de rolagem cobrem dezenas de mensagens do dia
+
+    for (let s = 1; s <= steps; s++) {
+      scrollBox.scrollTop = Math.max(0, scrollBox.scrollTop - 800);
+      extractAllChatOffers();
+
+      if (onProgress) {
+        onProgress(s, steps, harvestedOffersCache.size);
+      }
+
+      await new Promise(r => setTimeout(r, 350));
+    }
+
+    // Volta o scroll para a posição final
+    scrollBox.scrollTop = originalScrollTop;
+
+    const all = Array.from(harvestedOffersCache.values());
+    showToast(`⚡ <b>Pronto!</b> ${all.length} ofertas do dia capturadas com sucesso!`);
+    return all;
+  }
+
+  // 15. Toast visual no WhatsApp Web
   function showToast(text) {
     let toast = document.getElementById('nanda-whatsapp-toast');
     if (!toast) {
@@ -345,17 +432,17 @@
     setTimeout(() => {
       toast.style.opacity = '0';
       toast.style.transform = 'translateY(10px)';
-    }, 4000);
+    }, 4500);
   }
 
-  // 13. Injeta botões "⚡ Clonar c/ Meu Link" nas mensagens do chat
+  // 16. Injeta botões "⚡ Clonar c/ Meu Link" nas mensagens do chat
   function injectCloneButtons() {
     const nodes = getChatMsgElements();
 
     nodes.forEach(node => {
       if (node.querySelector('.nanda-clone-btn')) return;
 
-      const text = node.innerText || '';
+      const text = getNodeFullText(node);
       const hasOffer = /(http|meli\.la|shope\.ee|amzn\.to|mercadolivre|shopee|amazon|magalu)/i.test(text);
       if (!hasOffer) return;
 
@@ -387,7 +474,6 @@
         e.stopPropagation();
         e.preventDefault();
 
-        // Extrai todas as ofertas da conversa e pega a correspondente ou a última
         const offers = extractAllChatOffers();
         const thisUrls = extractUrlsFromText(text);
         let targetOffer = null;
@@ -414,15 +500,18 @@
     });
   }
 
-  // 14. Botão Flutuante Superior VIP no WhatsApp Web
+  // 17. Barra Flutuante com Botão para Puxar Todas as Ofertas do Dia
   function injectFloatingBar() {
     if (document.getElementById('nanda-wpp-floating-btn')) return;
 
     const bar = document.createElement('div');
     bar.id = 'nanda-wpp-floating-btn';
     bar.innerHTML = `
-      <button id="nanda-quick-clone-btn" title="Clonar última oferta com seu link">
-        ⚡ <b>Achados da Nanda PRO</b> · Capturar Ofertas do Chat
+      <button id="nanda-fetch-all-day-btn" title="Rola o chat para cima e puxa todas as ofertas enviadas durante o dia">
+        📜 <b>Puxar Todas do Dia</b>
+      </button>
+      <button id="nanda-quick-clone-btn" title="Copia a última oferta com seu link">
+        ⚡ <b>Clonar c/ Meu Link</b>
       </button>
     `;
     bar.style.cssText = `
@@ -432,40 +521,52 @@
       z-index: 99999;
       display: flex;
       align-items: center;
+      gap: 8px;
     `;
 
-    const btn = bar.querySelector('#nanda-quick-clone-btn');
-    btn.style.cssText = `
+    const btnAllDay = bar.querySelector('#nanda-fetch-all-day-btn');
+    btnAllDay.style.cssText = `
+      background: #18181b;
+      color: #ffffff;
+      border: 1.5px solid #ec4899;
+      padding: 7px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s ease;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+
+    const btnQuick = bar.querySelector('#nanda-quick-clone-btn');
+    btnQuick.style.cssText = `
       background: linear-gradient(135deg, #ec4899, #db2777);
       color: #ffffff;
       border: none;
-      padding: 8px 16px;
+      padding: 7px 14px;
       border-radius: 20px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       cursor: pointer;
       box-shadow: 0 4px 14px rgba(236, 72, 153, 0.4);
       transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      gap: 6px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     `;
 
-    btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.05)'; });
-    btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
+    btnAllDay.addEventListener('click', () => {
+      autoScrollAndHarvestAllDay();
+    });
 
-    btn.addEventListener('click', () => {
+    btnQuick.addEventListener('click', () => {
       const offers = extractAllChatOffers();
       if (offers.length === 0) {
-        showToast('⚠️ Nenhuma oferta com link identificada nesta conversa aberta.');
+        showToast('⚠️ Nenhuma oferta identificada. Role o chat ou clique em Puxar Todas do Dia.');
         return;
       }
-
-      // Pega a oferta mais recente
       const latest = offers[offers.length - 1];
       navigator.clipboard.writeText(latest.convertedText).then(() => {
-        showToast(`⚡ <b>${offers.length} Oferta(s) Encontrada(s)!</b> Última copiada c/ seu link.`);
+        showToast(`⚡ <b>${offers.length} Oferta(s) Pronta(s)!</b> Última copiada com seu link.`);
       });
     });
 
@@ -474,17 +575,19 @@
 
   // Observa mudanças no DOM
   const observer = new MutationObserver(() => {
+    extractAllChatOffers();
     injectCloneButtons();
     injectFloatingBar();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
   setTimeout(() => {
+    extractAllChatOffers();
     injectCloneButtons();
     injectFloatingBar();
   }, 1500);
 
-  // 15. Listener para o Popup da Extensão
+  // 18. Listener para o Popup da Extensão
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'EXTRACT_PRODUCT' || request.action === 'GET_HARVESTED_OFFERS') {
       const offers = extractAllChatOffers();
@@ -509,6 +612,24 @@
       }
       return true;
     }
+
+    if (request.action === 'FETCH_ALL_DAY_OFFERS') {
+      autoScrollAndHarvestAllDay().then((allOffers) => {
+        sendResponse({
+          success: true,
+          data: {
+            isListing: true,
+            totalFound: allOffers.length,
+            marketplace: 'WhatsApp Web',
+            products: allOffers,
+          },
+          offers: allOffers,
+          marketplace: 'WhatsApp Web',
+        });
+      });
+      return true; // Resposta assíncrona
+    }
+
     return true;
   });
 })();

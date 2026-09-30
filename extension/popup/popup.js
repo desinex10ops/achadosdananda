@@ -52,6 +52,7 @@ const btnSelectAll = document.getElementById('btnSelectAll');
 const btnSelect40 = document.getElementById('btnSelect40');
 const btnSelect50 = document.getElementById('btnSelect50');
 const btnDeselectAll = document.getElementById('btnDeselectAll');
+const btnFetchAllDay = document.getElementById('btnFetchAllDay');
 const batchProgressContainer = document.getElementById('batchProgressContainer');
 const batchProgressBar = document.getElementById('batchProgressBar');
 const batchProgressText = document.getElementById('batchProgressText');
@@ -371,6 +372,43 @@ btnDeselectAll.addEventListener('click', () => {
   renderBatchProductCards();
   updateBatchCounters();
 });
+
+if (btnFetchAllDay) {
+  btnFetchAllDay.addEventListener('click', async () => {
+    btnFetchAllDay.disabled = true;
+    btnFetchAllDay.innerText = '📜 Puxando ofertas do dia... (aguarde)';
+    showFeedback('Puxando histórico de ofertas do dia...', 'info');
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab || !tab.id) {
+        btnFetchAllDay.disabled = false;
+        btnFetchAllDay.innerText = '📜 Puxar Todas as Ofertas do Dia (Auto-Scroll)';
+        return;
+      }
+
+      chrome.tabs.sendMessage(tab.id, { action: 'FETCH_ALL_DAY_OFFERS' }, (response) => {
+        btnFetchAllDay.disabled = false;
+        btnFetchAllDay.innerText = '📜 Puxar Todas as Ofertas do Dia (Auto-Scroll)';
+
+        if (response && response.success && response.offers && response.offers.length > 0) {
+          renderBatchView({
+            totalFound: response.offers.length,
+            marketplace: 'WhatsApp Web',
+            products: response.offers,
+          });
+          showFeedback(`⚡ Sucesso! ${response.offers.length} ofertas do dia capturadas!`, 'success');
+        } else {
+          showFeedback('Nenhuma nova oferta identificada.', 'info');
+        }
+      });
+    } catch (e) {
+      btnFetchAllDay.disabled = false;
+      btnFetchAllDay.innerText = '📜 Puxar Todas as Ofertas do Dia (Auto-Scroll)';
+      showFeedback('Erro ao puxar histórico do dia.', 'error');
+    }
+  });
+}
 
 // 7. Envio em Lote Super Rápido (Single Batch POST)
 async function sendBatchOffers(action) {
