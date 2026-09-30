@@ -541,13 +541,13 @@ async function extractFromCurrentTab() {
       return;
     }
 
-    // Primeiro tenta buscar ofertas colhidas pelo Auto-Scroll Harvester
+    // Primeiro tenta buscar ofertas colhidas pelo Auto-Scroll Harvester ou WhatsApp
     chrome.tabs.sendMessage(tab.id, { action: 'GET_HARVESTED_OFFERS' }, (response) => {
-      if (chrome.runtime.lastError || !response || !response.success || !response.offers || response.offers.length === 0) {
-        // Fallback: extração padrão pontual
+      if (chrome.runtime.lastError || !response || !response.success || (!response.offers && !response.data)) {
+        // Fallback: extração pontual
         chrome.tabs.sendMessage(tab.id, { action: 'EXTRACT_PRODUCT' }, (fallbackRes) => {
           loadingState.classList.add('hidden');
-          if (chrome.runtime.lastError || !fallbackRes || !fallbackRes.success) {
+          if (chrome.runtime.lastError || !fallbackRes || !fallbackRes.success || !fallbackRes.data) {
             emptyState.classList.remove('hidden');
             return;
           }
@@ -561,13 +561,19 @@ async function extractFromCurrentTab() {
         return;
       }
 
-      // Se encontrou ofertas colhidas
+      // Se encontrou dados válidos
       loadingState.classList.add('hidden');
-      renderBatchView({
-        totalFound: response.offers.length,
-        marketplace: response.marketplace,
-        products: response.offers,
-      });
+      if (response.data && !response.data.isListing) {
+        renderSingleView(response.data);
+      } else if (response.data && response.data.isListing) {
+        renderBatchView(response.data);
+      } else if (response.offers && response.offers.length > 0) {
+        renderBatchView({
+          totalFound: response.offers.length,
+          marketplace: response.marketplace || 'Ofertas',
+          products: response.offers,
+        });
+      }
     });
   } catch (err) {
     loadingState.classList.add('hidden');
