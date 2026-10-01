@@ -212,10 +212,15 @@ function renderSingleView(product) {
   productImage.src = product.imageUrl || FALLBACK_PRODUCT_IMAGE;
   productImage.onerror = () => { productImage.src = FALLBACK_PRODUCT_IMAGE; };
 
-  const orig = product.originalPrice || product.currentPrice;
-  const curr = product.currentPrice;
-  productOrigPrice.innerText = formatCurrency(orig);
-  productCurrPrice.innerText = formatCurrency(curr);
+  let orig = product.originalPrice || product.currentPrice;
+  let curr = product.currentPrice;
+  if (orig < curr && orig > 0) {
+    const tmp = orig;
+    orig = curr;
+    curr = tmp;
+  }
+  productOrigPrice.innerText = orig > curr ? `De: ${formatCurrency(orig)}` : '';
+  productCurrPrice.innerText = orig > curr ? `Por: ${formatCurrency(curr)}` : formatCurrency(curr);
 
   if (orig > curr) {
     const disc = Math.round(((orig - curr) / orig) * 100);
@@ -334,8 +339,13 @@ function renderBatchProductCards() {
   batchProductsList.innerHTML = currentBatchProducts
     .map((prod) => {
       const isSelected = selectedProductIds.has(prod.id);
-      const orig = prod.originalPrice || prod.currentPrice;
-      const curr = prod.currentPrice;
+      let orig = prod.originalPrice || prod.currentPrice;
+      let curr = prod.currentPrice;
+      if (orig < curr && orig > 0) {
+        const tmp = orig;
+        orig = curr;
+        curr = tmp;
+      }
       const disc = prod.discountPercentage || (orig > curr ? Math.round(((orig - curr) / orig) * 100) : 0);
 
       return `
@@ -343,12 +353,12 @@ function renderBatchProductCards() {
           <img src="${prod.imageUrl || FALLBACK_PRODUCT_IMAGE}" class="batch-thumb" alt="Foto" onerror="this.onerror=null;this.src=FALLBACK_PRODUCT_IMAGE">
           <div class="batch-details">
             <h5 class="batch-item-title">${prod.title}</h5>
-            <div>
-              <span class="batch-item-price">${formatCurrency(curr)}</span>
-              ${orig > curr ? `<span class="batch-item-old">${formatCurrency(orig)}</span>` : ''}
-              ${disc > 0 ? `<span class="batch-item-disc">${disc}% OFF</span>` : ''}
+            <div style="display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-top: 3px;">
+              <span class="batch-item-price" style="font-size: 13px; font-weight: 800; color: #ec4899;">${formatCurrency(curr)}</span>
+              ${orig > curr ? `<span class="batch-item-old" style="font-size: 11px; text-decoration: line-through; color: #94a3b8;">${formatCurrency(orig)}</span>` : ''}
+              ${disc > 0 ? `<span class="batch-item-disc" style="font-size: 10px; font-weight: 700; color: #10b981; background: rgba(16,185,129,0.12); padding: 1px 5px; border-radius: 4px;">${disc}% OFF</span>` : ''}
             </div>
-            <div style="font-size: 10px; color: #10b981; margin-top: 2px;">✓ Link de Afiliada Ativo</div>
+            <div style="font-size: 10px; color: #10b981; margin-top: 3px; font-weight: 600;">✓ Link de Afiliada Ativo</div>
           </div>
         </div>
       `;

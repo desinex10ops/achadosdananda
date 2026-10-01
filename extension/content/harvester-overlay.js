@@ -78,6 +78,115 @@
     }
   }
 
+  // Extrator Infalível de Preços do Mercado Livre (Garante De: R$ 399,99 e Por: R$ 266,99)
+  function extractMercadoLivrePrices(scope) {
+    function parseAmount(el) {
+      if (!el) return 0;
+      const frac = el.querySelector('.andes-money-amount__fraction') || (el.classList && el.classList.contains('andes-money-amount__fraction') ? el : null);
+      if (!frac) return 0;
+      const intPart = frac.innerText.replace(/\D/g, '');
+      if (!intPart) return 0;
+      const cents = el.querySelector('.andes-money-amount__cents');
+      const centsPart = cents ? cents.innerText.replace(/\D/g, '') : '00';
+      return parseFloat(`${intPart}.${centsPart}`) || 0;
+    }
+
+    // 1. Extrai Preço Original (De / Riscado / Antigo)
+    let originalPrice = 0;
+    const origContainer = 
+      scope.querySelector('.poly-price__original-value') ||
+      scope.querySelector('.ui-search-price__original-value') ||
+      scope.querySelector('.ui-pdp-price__original-value') ||
+      scope.querySelector('s.andes-money-amount') ||
+      scope.querySelector('s') ||
+      scope.querySelector('.andes-money-amount--previous');
+
+    if (origContainer) {
+      originalPrice = parseAmount(origContainer);
+    }
+
+    // 2. Extrai Preço Atual (Por / Oferta em Destaque)
+    let currentPrice = 0;
+    const currContainer = 
+      scope.querySelector('.poly-price__current') ||
+      scope.querySelector('.ui-search-price__second-line') ||
+      scope.querySelector('.ui-pdp-price__second-line') ||
+      scope.querySelector('.ui-pdp-price__main-container');
+
+    if (currContainer) {
+      currentPrice = parseAmount(currContainer);
+    }
+
+    // Fallback: se não achou pelo container específico de preço atual, busca nos andes-money-amount filtrando fora preços antigos e parcelamento
+    if (!currentPrice || currentPrice <= 0) {
+      const allAmounts = Array.from(scope.querySelectorAll('.andes-money-amount'));
+      for (const amt of allAmounts) {
+        if (amt.closest('s, .andes-money-amount--previous, .poly-price__original-value, .ui-search-price__original-value, .ui-pdp-price__original-value')) {
+          continue;
+        }
+        if (amt.closest('.poly-price__installments, .ui-search-installments, .ui-pdp-price__subtitles, [class*="installments"]')) {
+          continue;
+        }
+        const val = parseAmount(amt);
+        if (val > 0) {
+          currentPrice = val;
+          break;
+        }
+      }
+    }
+
+    // Extrai Desconto Percentual se existir no DOM
+    let discount = 0;
+    const discElem = 
+      scope.querySelector('.andes-money-amount__discount') ||
+      scope.querySelector('.poly-price__disc') ||
+      scope.querySelector('.ui-pdp-price__second-line .ui-pdp-discount') ||
+      scope.querySelector('[class*="discount"]');
+    if (discElem) {
+      const m = discElem.innerText.match(/\d+/);
+      if (m) discount = parseInt(m[0], 10);
+    }
+
+    // Regras de Ouro e Validação Matemática:
+    if (discount > 0 && discount < 100) {
+      if (originalPrice > 0 && currentPrice > 0) {
+        if (originalPrice < currentPrice) {
+          // Invertidos! O maior é o original (De) e o menor é a oferta (Por)
+          const tmp = originalPrice;
+          originalPrice = currentPrice;
+          currentPrice = tmp;
+        } else if (originalPrice === currentPrice) {
+          // Ambos pegaram o mesmo valor! Recalcula o preço da oferta aplicando o desconto
+          currentPrice = Math.round(originalPrice * (1 - discount / 100) * 100) / 100;
+        }
+      } else if (currentPrice > 0 && originalPrice === 0) {
+        originalPrice = Math.round((currentPrice / (1 - discount / 100)) * 100) / 100;
+      } else if (originalPrice > 0 && currentPrice === 0) {
+        currentPrice = Math.round(originalPrice * (1 - discount / 100) * 100) / 100;
+      }
+    }
+
+    // Fallbacks finais se não tiver desconto explícito
+    if (!originalPrice || originalPrice <= 0) {
+      originalPrice = currentPrice;
+    }
+    if (!currentPrice || currentPrice <= 0) {
+      currentPrice = originalPrice;
+    }
+
+    if (originalPrice < currentPrice && originalPrice > 0) {
+      const tmp = originalPrice;
+      originalPrice = currentPrice;
+      currentPrice = tmp;
+    }
+
+    if (discount === 0 && originalPrice > currentPrice) {
+      discount = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+    }
+
+    return { currentPrice, originalPrice, discount };
+  }
+
   // 2. Extração de ofertas de acordo com o marketplace
   function scanPageOffers() {
     if (!isAutoScrollActive) return;
@@ -99,37 +208,13 @@
           const cleanUrl = href.split('?')[0].split('#')[0];
           if (capturedOffers.has(cleanUrl)) return;
 
-          const fracElem = card.querySelector('.andes-money-amount__fraction') ||
-            card.querySelector('.poly-price__current .andes-money-amount__fraction');
-          const centsElem = card.querySelector('.andes-money-amount__cents');
-          let currentPrice = 0;
-          if (fracElem) {
-            const intPart = fracElem.innerText.replace(/\D/g, '');
-            const centsPart = centsElem ? centsElem.innerText.replace(/\D/g, '') : '00';
-            currentPrice = parseFloat(`${intPart}.${centsPart}`);
-          }
-          if (!currentPrice || currentPrice <= 0) return;
+          // Extração precisa do Preço Original (De) e Preço Atual (Por)
+          const { currentPrice, originalPrice, discount } = extractMercadoLivrePrices(card);
 
-          const origFrac = card.querySelector('s .andes-money-amount__fraction') ||
-            card.querySelector('.poly-price__original-value .andes-money-amount__fraction');
-          let originalPrice = currentPrice;
-          if (origFrac) {
-            const raw = parseFloat(origFrac.innerText.replace(/\D/g, ''));
-            if (raw > currentPrice) originalPrice = raw;
-          }
+          if (!currentPrice || currentPrice <= 0) return;
 
           const imgElem = card.querySelector('img.poly-component__picture') || card.querySelector('img[src*="http"]');
           const imageUrl = imgElem ? (imgElem.getAttribute('data-src') || imgElem.src) : '';
-
-          let discount = 0;
-          const discElem = card.querySelector('.andes-money-amount__discount') || card.querySelector('[class*="discount"]');
-          if (discElem) {
-            const m = discElem.innerText.match(/\d+/);
-            if (m) discount = parseInt(m[0]);
-          }
-          if (discount === 0 && originalPrice > currentPrice) {
-            discount = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
-          }
 
           const affiliateUrl = injectAffiliateTag(href);
 

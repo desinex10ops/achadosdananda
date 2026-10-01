@@ -113,7 +113,7 @@
     });
   }
 
-  // 4. Extrator Robusto de Preços (Elimina markdown do WhatsApp, trata espaços unicode e De/Por)
+  // 4. Extrator Robusto de Preços (Elimina markdown do WhatsApp, ignora parcelamento e separa De/Por)
   function extractPricesFromText(text) {
     if (!text) return { currentPrice: 0, originalPrice: 0 };
 
@@ -123,19 +123,47 @@
       .replace(/[*_~`]/g, '');
 
     // Busca padrão De / Por explícito
-    const porMatch = clean.match(/(?:por|por\s*apenas|valor|por:|preço|preco|pagando|sai\s*por|apenas)\s*[:]?\s*R\$\s*([\d.]+,\d{2}|\d+)/i);
     const deMatch = clean.match(/(?:de|de:|antes|era)\s*[:]?\s*R\$\s*([\d.]+,\d{2}|\d+)/i);
+    const porMatch = clean.match(/(?:por|por\s*apenas|valor|por:|preço|preco|pagando|sai\s*por|apenas)\s*[:]?\s*R\$\s*([\d.]+,\d{2}|\d+)/i);
 
-    let currentPrice = porMatch ? parseFloat(porMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
     let originalPrice = deMatch ? parseFloat(deMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+    let currentPrice = porMatch ? parseFloat(porMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
 
-    if (currentPrice > 0) {
-      if (originalPrice === 0) originalPrice = currentPrice;
+    // Remove menções de parcelamento (ex: 10x de R$ 25,00) para não contaminar detecção de preços totais
+    const cleanNoInstallments = clean.replace(/\b\d+\s*x\s*(?:de\s*)?R\$\s*[\d.,]+/gi, '');
+
+    // Se achou Por mas não achou De, ou vice-versa, busca outros preços na mensagem
+    if (currentPrice > 0 && originalPrice === 0) {
+      const otherPrices = Array.from(cleanNoInstallments.matchAll(/R\$\s*([\d.]+,\d{2}|\d+)/gi))
+        .map(m => parseFloat(m[1].replace(/\./g, '').replace(',', '.')) || 0)
+        .filter(p => p > currentPrice);
+      if (otherPrices.length > 0) {
+        originalPrice = Math.max(...otherPrices);
+      } else {
+        originalPrice = currentPrice;
+      }
+    } else if (originalPrice > 0 && currentPrice === 0) {
+      const otherPrices = Array.from(cleanNoInstallments.matchAll(/R\$\s*([\d.]+,\d{2}|\d+)/gi))
+        .map(m => parseFloat(m[1].replace(/\./g, '').replace(',', '.')) || 0)
+        .filter(p => p > 0 && p < originalPrice);
+      if (otherPrices.length > 0) {
+        currentPrice = Math.min(...otherPrices);
+      } else {
+        currentPrice = originalPrice;
+      }
+    }
+
+    if (currentPrice > 0 && originalPrice > 0) {
+      if (originalPrice < currentPrice) {
+        const tmp = originalPrice;
+        originalPrice = currentPrice;
+        currentPrice = tmp;
+      }
       return { currentPrice, originalPrice };
     }
 
-    // Procura qualquer ocorrência de "R$ valor"
-    const allPrices = Array.from(clean.matchAll(/R\$\s*([\d.]+,\d{2}|\d+)/gi))
+    // Procura qualquer ocorrência de "R$ valor" no texto sem parcelas
+    const allPrices = Array.from(cleanNoInstallments.matchAll(/R\$\s*([\d.]+,\d{2}|\d+)/gi))
       .map(m => parseFloat(m[1].replace(/\./g, '').replace(',', '.')) || 0)
       .filter(p => p > 0);
 

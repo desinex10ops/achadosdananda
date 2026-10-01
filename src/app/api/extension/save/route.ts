@@ -8,8 +8,13 @@ async function saveOneOffer(item: any, defaultTemplate: any, defaultGroups: any[
   const title = item.title || item.name || item.produto || "Produto Sem Nome";
   const rawOrig = item.originalPrice || item.precoOriginal || item.regularPrice || 0;
   const rawCurr = item.currentPrice || item.precoAtual || item.price || 0;
-  const origPrice = parseFloat(String(rawOrig)) || parseFloat(String(rawCurr)) || 0;
-  const currPrice = parseFloat(String(rawCurr)) || origPrice;
+  let origPrice = parseFloat(String(rawOrig)) || parseFloat(String(rawCurr)) || 0;
+  let currPrice = parseFloat(String(rawCurr)) || origPrice;
+  if (origPrice > 0 && currPrice > 0 && origPrice < currPrice) {
+    const tmp = origPrice;
+    origPrice = currPrice;
+    currPrice = tmp;
+  }
 
   const { discountPercentage, savedAmount } = calculateDiscount(origPrice, currPrice);
 
