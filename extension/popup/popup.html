@@ -36,139 +36,249 @@
       <div style="font-size: 10px; color: #10b981; margin-top: 4px;">✓ Conecte seu site local ou em produção na Vercel</div>
     </div>
 
+    <!-- Abas de Navegação -->
+    <div style="display: flex; border-bottom: 1px solid #27272a; background: #0f172a;">
+      <button id="tabOffers" style="flex: 1; padding: 10px 6px; font-size: 11px; font-weight: 700; background: none; border: none; border-bottom: 2px solid #ec4899; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+        🛍️ Ofertas & Harvester
+      </button>
+      <button id="tabTikTok" style="flex: 1; padding: 10px 6px; font-size: 11px; font-weight: 700; background: none; border: none; border-bottom: 2px solid transparent; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+        🎵 TikTok Auto-DM
+      </button>
+    </div>
+
     <!-- Main Content -->
     <main class="content">
-      <!-- Loading State -->
-      <div id="loadingState" class="state-panel">
-        <div class="spinner"></div>
-        <p>Analisando ofertas capturadas...</p>
-      </div>
+      <!-- CONTAINER ABA 1: OFERTAS & HARVESTER -->
+      <div id="offersContainer">
+        <!-- Loading State -->
+        <div id="loadingState" class="state-panel">
+          <div class="spinner"></div>
+          <p>Analisando ofertas capturadas...</p>
+        </div>
 
-      <!-- Empty State -->
-      <div id="emptyState" class="state-panel hidden">
-        <div class="empty-icon">🛍️</div>
-        <h3>Nenhum produto detectado</h3>
-        <p>Abra uma página de produto ou lista de ofertas no Mercado Livre, Shopee, Amazon ou WhatsApp Web. Role a página para capturar automaticamente!</p>
-        <button id="btnRetry" class="btn btn-secondary">Tentar Novamente</button>
+        <!-- Empty State -->
+        <div id="emptyState" class="state-panel hidden">
+          <div class="empty-icon">🛍️</div>
+          <h3>Nenhum produto detectado</h3>
+          <p>Abra uma página de produto ou lista de ofertas no Mercado Livre, Shopee, Amazon ou WhatsApp Web. Role a página para capturar automaticamente!</p>
+          <button id="btnRetry" class="btn btn-secondary">Tentar Novamente</button>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- MODO 1: PRODUTO ÚNICO                          -->
+        <!-- ============================================== -->
+        <div id="singleProductView" class="hidden">
+          <div class="card product-card">
+            <img id="productImage" src="" alt="Produto" class="product-thumb">
+            <div class="product-info">
+              <span class="marketplace-pill" id="productMarketplace">Mercado Livre</span>
+              <h4 id="productTitle" class="product-title">Título</h4>
+              <div class="price-row">
+                <span id="productOrigPrice" class="price-old">R$ 0,00</span>
+                <span id="productCurrPrice" class="price-current">R$ 0,00</span>
+                <span id="productDiscount" class="discount-badge">0% OFF</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Link de Afiliado (com seu código já inserido):</label>
+            <input type="text" id="affiliateUrl" class="input">
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Template:</label>
+              <select id="templateSelect" class="input"></select>
+            </div>
+            <div class="form-group">
+              <label>Grupo:</label>
+              <select id="groupSelect" class="input"></select>
+            </div>
+          </div>
+
+          <div class="preview-card">
+            <div class="preview-header">
+              <span>💬 Preview WhatsApp</span>
+              <button id="btnCopyText" class="btn-tiny">Copiar</button>
+            </div>
+            <div class="whatsapp-bubble" id="whatsappPreview"></div>
+          </div>
+
+          <div class="actions">
+            <button id="btnAddToQueue" class="btn btn-primary">
+              ⚡ Adicionar à Fila
+            </button>
+            <div class="action-grid">
+              <button id="btnSaveRadar" class="btn btn-secondary">
+                🔥 Salvar no Radar
+              </button>
+              <button id="btnOpenWhatsApp" class="btn btn-whatsapp">
+                💬 Abrir WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- MODO 2: LOTE / VITRINE DE OFERTAS (MULTI-ITEM) -->
+        <!-- ============================================== -->
+        <div id="batchListingView" class="hidden">
+          <!-- Vitrine Banner -->
+          <div class="batch-header">
+            <div>
+              <span class="badge-fire">🔥 Auto-Captura ao Rolar</span>
+              <h3 id="batchTitle" class="batch-title">Ofertas Encontradas</h3>
+            </div>
+            <span class="shield-badge" title="Links convertidos automaticamente com suas tags de afiliada.">
+              🛡️ Afiliada Ativa
+            </span>
+          </div>
+
+          <!-- Quick Filters -->
+          <div class="quick-filters">
+            <button id="btnSelectAll" class="filter-chip active">Todas</button>
+            <button id="btnSelect40" class="filter-chip">&gt; 40% OFF</button>
+            <button id="btnSelect50" class="filter-chip">&gt; 50% OFF</button>
+            <button id="btnDeselectAll" class="filter-chip">Desmarcar</button>
+          </div>
+
+          <div style="margin: 6px 0 10px 0;">
+            <button id="btnFetchAllDay" class="btn" style="width: 100%; font-size: 11px; padding: 7px; background: rgba(236,72,153,0.12); color: #ec4899; border: 1.5px dashed #ec4899; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              📜 Puxar Todas as Ofertas do Dia (Auto-Scroll)
+            </button>
+          </div>
+
+          <!-- Products List -->
+          <div id="batchProductsList" class="batch-list">
+            <!-- Items will be injected here -->
+          </div>
+
+          <!-- Batch Settings -->
+          <div class="grid-2 mt-2">
+            <div class="form-group">
+              <label>Template padrão:</label>
+              <select id="batchTemplateSelect" class="input"></select>
+            </div>
+            <div class="form-group">
+              <label>Grupo de destino:</label>
+              <select id="batchGroupSelect" class="input"></select>
+            </div>
+          </div>
+
+          <!-- Progress Bar for Batch Dispatch -->
+          <div id="batchProgressContainer" class="progress-container hidden">
+            <div class="progress-bar">
+              <div id="batchProgressBar" class="progress-fill"></div>
+            </div>
+            <span id="batchProgressText" class="progress-text">Enviando 0/0...</span>
+          </div>
+
+          <!-- Batch Actions -->
+          <div class="actions mt-2">
+            <button id="btnBatchAddToQueue" class="btn btn-primary">
+              ⚡ Adicionar Selecionados à Fila (<span id="selectedCountQueue">0</span>)
+            </button>
+            <button id="btnBatchSaveRadar" class="btn btn-secondary">
+              🔥 Salvar Selecionados no Radar (<span id="selectedCountRadar">0</span>)
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- ============================================== -->
-      <!-- MODO 1: PRODUTO ÚNICO                          -->
+      <!-- CONTAINER ABA 2: TIKTOK AUTO-DM (100% GRÁTIS)  -->
       <!-- ============================================== -->
-      <div id="singleProductView" class="hidden">
-        <div class="card product-card">
-          <img id="productImage" src="" alt="Produto" class="product-thumb">
-          <div class="product-info">
-            <span class="marketplace-pill" id="productMarketplace">Mercado Livre</span>
-            <h4 id="productTitle" class="product-title">Título</h4>
-            <div class="price-row">
-              <span id="productOrigPrice" class="price-old">R$ 0,00</span>
-              <span id="productCurrPrice" class="price-current">R$ 0,00</span>
-              <span id="productDiscount" class="discount-badge">0% OFF</span>
+      <div id="tiktokContainer" class="hidden">
+        <!-- Status Banner -->
+        <div style="background: linear-gradient(135deg, #18181b, #09090b); border: 1.5px solid #ec4899; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 16px;">🎵</span>
+              <strong style="color: #fdf2f8; font-size: 13px;">TikTok Auto-DM & Grupo VIP</strong>
+            </div>
+            <label style="position: relative; display: inline-block; width: 38px; height: 20px;">
+              <input type="checkbox" id="tkToggleEnabled" checked style="opacity: 0; width: 0; height: 0;">
+              <span id="tkSwitchBg" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ec4899; border-radius: 20px; transition: .3s;">
+                <span id="tkSwitchKnob" style="position: absolute; content: ''; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .3s; transform: translateX(18px);"></span>
+              </span>
+            </label>
+          </div>
+          <div id="tkStatusBadge" style="font-size: 11px; color: #22c55e;">
+            ● Ativo no TikTok Web (monitorando comentários)
+          </div>
+        </div>
+
+        <!-- Formulário de Configuração -->
+        <div class="form-group">
+          <label style="font-weight: 600;">👉 Link do seu Grupo VIP (WhatsApp ou Telegram):</label>
+          <input type="text" id="tkInputGroupLink" class="input" placeholder="https://chat.whatsapp.com/ExemploGrupoVIP">
+          <span style="font-size: 10px; color: #94a3b8; display: block; margin-top: 2px;">Esse link será enviado no direct de quem comentar pedindo código.</span>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label style="font-weight: 600;">⏳ Minutos Depois:</label>
+            <input type="number" id="tkInputDelayMinutes" class="input" min="1" max="60" value="2">
+            <span style="font-size: 10px; color: #94a3b8; display: block; margin-top: 2px;">Espera humanizada.</span>
+          </div>
+          <div class="form-group">
+            <label style="font-weight: 600;">❤️ Curtir Comentário:</label>
+            <div style="display: flex; align-items: center; gap: 6px; height: 34px;">
+              <input type="checkbox" id="tkCheckLike" checked style="cursor: pointer; width: 16px; height: 16px;">
+              <span style="font-size: 11px;">Curtir antes de responder</span>
             </div>
           </div>
         </div>
 
         <div class="form-group">
-          <label>Link de Afiliado (com seu código já inserido):</label>
-          <input type="text" id="affiliateUrl" class="input">
+          <label style="font-weight: 600;">🔑 Palavras-chave gatilho (separadas por vírgula):</label>
+          <input type="text" id="tkInputKeywords" class="input" value="quero, quero codigo, codigo, código, link, manda, eu quero, valor">
         </div>
 
-        <div class="grid-2">
-          <div class="form-group">
-            <label>Template:</label>
-            <select id="templateSelect" class="input"></select>
+        <div class="form-group">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+            <label style="font-weight: 600;">💬 Resposta Pública no Comentário do Vídeo:</label>
+            <label style="font-size: 10px; display: flex; align-items: center; gap: 4px;">
+              <input type="checkbox" id="tkCheckReply" checked> Ativar resposta
+            </label>
           </div>
-          <div class="form-group">
-            <label>Grupo:</label>
-            <select id="groupSelect" class="input"></select>
-          </div>
+          <textarea id="tkInputReplyText" class="input" rows="2" style="font-size: 11px; resize: vertical;">Te mandei o convite exclusivo no direct! Dá uma olhadinha 💖</textarea>
+          <span style="font-size: 10px; color: #94a3b8; display: block; margin-top: 2px;">Aumenta o alcance do vídeo e engaja outros seguidores!</span>
         </div>
 
-        <div class="preview-card">
-          <div class="preview-header">
-            <span>💬 Preview WhatsApp</span>
-            <button id="btnCopyText" class="btn-tiny">Copiar</button>
+        <div class="form-group">
+          <label style="font-weight: 600;">✉️ Mensagem Privada no Direct (DM):</label>
+          <textarea id="tkInputDmText" class="input" rows="4" style="font-size: 11px; resize: vertical;">Oii linda! Tudo bem? 🥰
+
+Vi que você comentou pedindo o código no meu vídeo!
+
+Para não perder nenhuma promoção relâmpago, cupons secretos e os links dos achadinhos antes de todo mundo, entra no nosso Grupo VIP no WhatsApp:
+
+👉 {GRUPO_LINK}
+
+Te vejo lá dentro! ✨</textarea>
+          <span style="font-size: 10px; color: #94a3b8; display: block; margin-top: 2px;">A tag <code>{GRUPO_LINK}</code> será substituída pelo link acima.</span>
+        </div>
+
+        <!-- Estatísticas Rápidas -->
+        <div style="display: flex; justify-content: space-between; background: #1e293b; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 11px;">
+          <div>
+            <span style="color: #94a3b8;">DMs Enviadas Hoje:</span>
+            <strong id="tkSentCountText" style="color: #10b981; margin-left: 4px;">0</strong>
           </div>
-          <div class="whatsapp-bubble" id="whatsappPreview"></div>
+          <div>
+            <span style="color: #94a3b8;">Aguardando Fila:</span>
+            <strong id="tkQueueCountText" style="color: #38bdf8; margin-left: 4px;">0</strong>
+          </div>
         </div>
 
         <div class="actions">
-          <button id="btnAddToQueue" class="btn btn-primary">
-            ⚡ Adicionar à Fila
+          <button id="btnSaveTkConfig" class="btn btn-primary">
+            💾 Salvar Configurações do TikTok
           </button>
-          <div class="action-grid">
-            <button id="btnSaveRadar" class="btn btn-secondary">
-              🔥 Salvar no Radar
-            </button>
-            <button id="btnOpenWhatsApp" class="btn btn-whatsapp">
-              💬 Abrir WhatsApp
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============================================== -->
-      <!-- MODO 2: LOTE / VITRINE DE OFERTAS (MULTI-ITEM) -->
-      <!-- ============================================== -->
-      <div id="batchListingView" class="hidden">
-        <!-- Vitrine Banner -->
-        <div class="batch-header">
-          <div>
-            <span class="badge-fire">🔥 Auto-Captura ao Rolar</span>
-            <h3 id="batchTitle" class="batch-title">Ofertas Encontradas</h3>
-          </div>
-          <span class="shield-badge" title="Links convertidos automaticamente com suas tags de afiliada.">
-            🛡️ Afiliada Ativa
-          </span>
-        </div>
-
-        <!-- Quick Filters -->
-        <div class="quick-filters">
-          <button id="btnSelectAll" class="filter-chip active">Todas</button>
-          <button id="btnSelect40" class="filter-chip">&gt; 40% OFF</button>
-          <button id="btnSelect50" class="filter-chip">&gt; 50% OFF</button>
-          <button id="btnDeselectAll" class="filter-chip">Desmarcar</button>
-        </div>
-
-        <div style="margin: 6px 0 10px 0;">
-          <button id="btnFetchAllDay" class="btn" style="width: 100%; font-size: 11px; padding: 7px; background: rgba(236,72,153,0.12); color: #ec4899; border: 1.5px dashed #ec4899; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-            📜 Puxar Todas as Ofertas do Dia (Auto-Scroll)
-          </button>
-        </div>
-
-        <!-- Products List -->
-        <div id="batchProductsList" class="batch-list">
-          <!-- Items will be injected here -->
-        </div>
-
-        <!-- Batch Settings -->
-        <div class="grid-2 mt-2">
-          <div class="form-group">
-            <label>Template padrão:</label>
-            <select id="batchTemplateSelect" class="input"></select>
-          </div>
-          <div class="form-group">
-            <label>Grupo de destino:</label>
-            <select id="batchGroupSelect" class="input"></select>
-          </div>
-        </div>
-
-        <!-- Progress Bar for Batch Dispatch -->
-        <div id="batchProgressContainer" class="progress-container hidden">
-          <div class="progress-bar">
-            <div id="batchProgressBar" class="progress-fill"></div>
-          </div>
-          <span id="batchProgressText" class="progress-text">Enviando 0/0...</span>
-        </div>
-
-        <!-- Batch Actions -->
-        <div class="actions mt-2">
-          <button id="btnBatchAddToQueue" class="btn btn-primary">
-            ⚡ Adicionar Selecionados à Fila (<span id="selectedCountQueue">0</span>)
-          </button>
-          <button id="btnBatchSaveRadar" class="btn btn-secondary">
-            🔥 Salvar Selecionados no Radar (<span id="selectedCountRadar">0</span>)
+          <button id="btnOpenTikTokWeb" class="btn btn-secondary" style="margin-top: 6px;">
+            🌐 Abrir TikTok Web
           </button>
         </div>
       </div>

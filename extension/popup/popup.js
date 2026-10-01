@@ -684,5 +684,147 @@ async function extractFromCurrentTab() {
   await loadServerConfig();
   await checkBackendConnection();
   await loadConfig();
+  loadTikTokConfig();
   await extractFromCurrentTab();
 })();
+
+// ==========================================
+// ABA TIKTOK AUTO-DM (100% GRATUITO)
+// ==========================================
+const tabOffers = document.getElementById('tabOffers');
+const tabTikTok = document.getElementById('tabTikTok');
+const offersContainer = document.getElementById('offersContainer');
+const tiktokContainer = document.getElementById('tiktokContainer');
+
+const tkToggleEnabled = document.getElementById('tkToggleEnabled');
+const tkSwitchBg = document.getElementById('tkSwitchBg');
+const tkSwitchKnob = document.getElementById('tkSwitchKnob');
+const tkStatusBadge = document.getElementById('tkStatusBadge');
+const tkInputGroupLink = document.getElementById('tkInputGroupLink');
+const tkInputDelayMinutes = document.getElementById('tkInputDelayMinutes');
+const tkCheckLike = document.getElementById('tkCheckLike');
+const tkInputKeywords = document.getElementById('tkInputKeywords');
+const tkCheckReply = document.getElementById('tkCheckReply');
+const tkInputReplyText = document.getElementById('tkInputReplyText');
+const tkInputDmText = document.getElementById('tkInputDmText');
+const tkSentCountText = document.getElementById('tkSentCountText');
+const tkQueueCountText = document.getElementById('tkQueueCountText');
+const btnSaveTkConfig = document.getElementById('btnSaveTkConfig');
+const btnOpenTikTokWeb = document.getElementById('btnOpenTikTokWeb');
+
+function switchMainTab(activeTab) {
+  if (activeTab === 'offers') {
+    tabOffers.style.borderBottomColor = '#ec4899';
+    tabOffers.style.color = '#fff';
+    tabTikTok.style.borderBottomColor = 'transparent';
+    tabTikTok.style.color = '#94a3b8';
+    offersContainer.classList.remove('hidden');
+    tiktokContainer.classList.add('hidden');
+  } else {
+    tabTikTok.style.borderBottomColor = '#ec4899';
+    tabTikTok.style.color = '#fff';
+    tabOffers.style.borderBottomColor = 'transparent';
+    tabOffers.style.color = '#94a3b8';
+    tiktokContainer.classList.remove('hidden');
+    offersContainer.classList.add('hidden');
+    loadTikTokConfig();
+  }
+}
+
+tabOffers?.addEventListener('click', () => switchMainTab('offers'));
+tabTikTok?.addEventListener('click', () => switchMainTab('tiktok'));
+
+function updateTkSwitchUI(enabled) {
+  if (!tkSwitchBg || !tkSwitchKnob || !tkStatusBadge) return;
+  if (enabled) {
+    tkSwitchBg.style.backgroundColor = '#ec4899';
+    tkSwitchKnob.style.transform = 'translateX(18px)';
+    tkStatusBadge.innerText = '● Ativo no TikTok Web (monitorando comentários)';
+    tkStatusBadge.style.color = '#22c55e';
+  } else {
+    tkSwitchBg.style.backgroundColor = '#3f3f46';
+    tkSwitchKnob.style.transform = 'translateX(0)';
+    tkStatusBadge.innerText = '⏸️ Automação Pausada';
+    tkStatusBadge.style.color = '#94a3b8';
+  }
+}
+
+tkToggleEnabled?.addEventListener('change', () => {
+  updateTkSwitchUI(tkToggleEnabled.checked);
+});
+
+function loadTikTokConfig() {
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+
+  chrome.storage.local.get(['tiktokConfig', 'tiktokSentCountToday', 'tiktokProcessedUsers'], (res) => {
+    const cfg = res.tiktokConfig || {};
+    if (tkToggleEnabled) {
+      tkToggleEnabled.checked = cfg.enabled !== false;
+      updateTkSwitchUI(tkToggleEnabled.checked);
+    }
+
+    if (cfg.groupLink && tkInputGroupLink) tkInputGroupLink.value = cfg.groupLink;
+    if (cfg.delayMinutes && tkInputDelayMinutes) tkInputDelayMinutes.value = cfg.delayMinutes;
+    if (cfg.likeComment !== undefined && tkCheckLike) tkCheckLike.checked = cfg.likeComment;
+    if (cfg.keywords && tkInputKeywords) tkInputKeywords.value = Array.isArray(cfg.keywords) ? cfg.keywords.join(', ') : cfg.keywords;
+    if (cfg.replyInComments !== undefined && tkCheckReply) tkCheckReply.checked = cfg.replyInComments;
+    if (cfg.commentReplyText && tkInputReplyText) tkInputReplyText.value = cfg.commentReplyText;
+    if (cfg.dmMessageText && tkInputDmText) tkInputDmText.value = cfg.dmMessageText;
+
+    if (tkSentCountText) tkSentCountText.innerText = res.tiktokSentCountToday || 0;
+
+    // Tenta obter status da aba ativa do TikTok
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs && tabs[0] && tabs[0].url && tabs[0].url.includes('tiktok.com')) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'TIKTOK_GET_STATUS' }, (statusRes) => {
+          if (statusRes && statusRes.success) {
+            if (tkQueueCountText) tkQueueCountText.innerText = statusRes.queueCount || 0;
+            if (tkSentCountText) tkSentCountText.innerText = statusRes.sentCountToday || 0;
+          }
+        });
+      }
+    });
+  });
+}
+
+btnSaveTkConfig?.addEventListener('click', () => {
+  const keywordsArr = (tkInputKeywords ? tkInputKeywords.value : '')
+    .split(',')
+    .map((k) => k.trim())
+    .filter((k) => k.length > 0);
+
+  const cfg = {
+    enabled: tkToggleEnabled ? tkToggleEnabled.checked : true,
+    groupLink: tkInputGroupLink ? tkInputGroupLink.value.trim() : '',
+    delayMinutes: parseInt(tkInputDelayMinutes ? tkInputDelayMinutes.value : '2', 10) || 2,
+    likeComment: tkCheckLike ? tkCheckLike.checked : true,
+    keywords: keywordsArr,
+    replyInComments: tkCheckReply ? tkCheckReply.checked : true,
+    commentReplyText: tkInputReplyText ? tkInputReplyText.value.trim() : '',
+    dmMessageText: tkInputDmText ? tkInputDmText.value.trim() : '',
+  };
+
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.set({ tiktokConfig: cfg }, () => {
+      showFeedback('Configurações do TikTok salvas com sucesso!', 'success');
+
+      // Notifica abas do TikTok
+      chrome.tabs.query({ url: '*://*.tiktok.com/*' }, (tabs) => {
+        if (tabs && tabs.length > 0) {
+          tabs.forEach((tab) => {
+            chrome.tabs.sendMessage(tab.id, { action: 'TIKTOK_UPDATE_CONFIG', config: cfg });
+          });
+        }
+      });
+    });
+  }
+});
+
+btnOpenTikTokWeb?.addEventListener('click', () => {
+  if (typeof chrome !== 'undefined' && chrome.tabs) {
+    chrome.tabs.create({ url: 'https://www.tiktok.com' });
+  } else {
+    window.open('https://www.tiktok.com', '_blank');
+  }
+});
+

@@ -16,6 +16,7 @@
     "https://*.shopee.com.br/*",
     "https://*.amazon.com.br/*",
     "https://web.whatsapp.com/*",
+    "https://*.tiktok.com/*",
     "http://localhost:3000/*",
     "https://*.vercel.app/*"
   ],
@@ -58,6 +59,13 @@
         "https://web.whatsapp.com/*"
       ],
       "js": ["content/whatsapp-scraper.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.tiktok.com/*"
+      ],
+      "js": ["content/tiktok-automator.js"],
       "run_at": "document_idle"
     }
   ],
