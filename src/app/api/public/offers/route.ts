@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
+const textFilter = (val: string) => {
+  const isPostgres = process.env.DATABASE_URL?.includes("postgres");
+  return isPostgres
+    ? { contains: val, mode: "insensitive" as const }
+    : { contains: val };
+};
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -13,21 +22,21 @@ export async function GET(req: NextRequest) {
 
     if (q) {
       where.OR = [
-        { title: { contains: q } },
-        { product: { name: { contains: q } } },
-        { product: { category: { contains: q } } },
+        { title: textFilter(q) },
+        { product: { name: textFilter(q) } },
+        { product: { category: textFilter(q) } },
       ];
     }
 
     if (category && category !== "Todas") {
       where.product = {
-        category: { contains: category },
+        category: textFilter(category),
       };
     }
 
     if (marketplaceSlug && marketplaceSlug !== "todos") {
       where.marketplace = {
-        slug: { contains: marketplaceSlug.toLowerCase() },
+        slug: textFilter(marketplaceSlug.toLowerCase()),
       };
     }
 

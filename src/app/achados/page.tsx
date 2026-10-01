@@ -227,9 +227,14 @@ export default function AchadosVitrinePage() {
                     {/* Imagem do Produto */}
                     <div className="relative aspect-square w-full rounded-xl bg-slate-950 overflow-hidden mb-2.5 border border-slate-800">
                       <Image
-                        src={item.imageUrl}
+                        src={
+                          item.imageUrl && !item.imageUrl.startsWith("blob:")
+                            ? item.imageUrl
+                            : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80"
+                        }
                         alt={item.title}
                         fill
+                        unoptimized={Boolean(item.imageUrl?.startsWith("data:"))}
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                       {/* Desconto */}

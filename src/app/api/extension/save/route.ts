@@ -13,7 +13,11 @@ async function saveOneOffer(item: any, defaultTemplate: any, defaultGroups: any[
 
   const { discountPercentage, savedAmount } = calculateDiscount(origPrice, currPrice);
 
-  const imageUrl = item.imageUrl || item.image || item.imagem || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80";
+  let rawImage = item.imageUrl || item.image || item.imagem || "";
+  if (typeof rawImage === "string" && rawImage.startsWith("blob:")) {
+    rawImage = "";
+  }
+  const imageUrl = rawImage || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80";
   const originalUrl = item.url || item.link || item.originalUrl || "";
   const affiliateUrl = item.affiliateUrl || originalUrl;
   const couponCode = item.coupon || item.cupom || item.couponCode || null;

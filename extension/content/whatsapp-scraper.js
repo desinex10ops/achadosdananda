@@ -481,6 +481,37 @@
     }, 4500);
   }
 
+  // Função ultra segura de cópia para área de transferência (com fallback para execCommand)
+  function safeCopyToClipboard(text) {
+    return new Promise((resolve, reject) => {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(resolve).catch(() => {
+          fallbackCopyText(text) ? resolve() : reject();
+        });
+      } else {
+        fallbackCopyText(text) ? resolve() : reject();
+      }
+    });
+  }
+
+  function fallbackCopyText(text) {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return success;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // 16. Injeta botões "⚡ Clonar c/ Meu Link" nas mensagens do chat
   function injectCloneButtons() {
     const nodes = getChatMsgElements();
@@ -534,7 +565,7 @@
 
         const toCopy = targetOffer ? targetOffer.convertedText : cloneAndConvertMessageText(text);
 
-        navigator.clipboard.writeText(toCopy).then(() => {
+        safeCopyToClipboard(toCopy).then(() => {
           showToast(`⚡ <b>Oferta Clonada!</b> Mensagem copiada com seu link de afiliada.`);
         }).catch(() => {
           showToast(`⚠️ Não foi possível copiar para a área de transferência.`);
@@ -611,7 +642,7 @@
         return;
       }
       const latest = offers[offers.length - 1];
-      navigator.clipboard.writeText(latest.convertedText).then(() => {
+      safeCopyToClipboard(latest.convertedText).then(() => {
         showToast(`⚡ <b>${offers.length} Oferta(s) Pronta(s)!</b> Última copiada com seu link.`);
       });
     });
