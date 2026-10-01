@@ -30,10 +30,10 @@ export async function GET(request: Request) {
       marketplace: c.marketplace?.name || "Geral",
       storeLogo: c.marketplace?.icon || "",
       discount: c.discount,
-      description: c.description || `Cupom de desconto para ${c.marketplace?.name}`,
+      description: c.notes || `Cupom de desconto para ${c.marketplace?.name}`,
       minSpend: c.minSpend ? `Gasto mín. R$ ${c.minSpend.toFixed(2)}` : "Sem valor mínimo",
       validUntil: c.validUntil ? new Date(c.validUntil).toLocaleDateString("pt-BR") : "Válido hoje",
-      affiliateUrl: c.affiliateUrl || c.marketplace?.defaultUrlPattern || "#",
+      affiliateUrl: c.link || c.marketplace?.defaultUrlPattern || "#",
       category: c.category || "Geral",
       isHot: c.status === "ACTIVE",
     }));

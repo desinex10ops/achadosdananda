@@ -120,3 +120,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+// Excluir múltiplos itens da fila em lote
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    const body = await request.json().catch(() => ({}));
+    const ids: string[] = body.ids || (id ? [id] : []);
+
+    if (!ids || ids.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "Nenhum ID informado para exclusão." },
+        { status: 400 }
+      );
+    }
+
+    // 1. Remove publicações dos grupos associados primeiro
+    await prisma.publicationGroup.deleteMany({
+      where: { publicationId: { in: ids } },
+    });
+
+    // 2. Remove as publicações da fila
+    const result = await prisma.publication.deleteMany({
+      where: { id: { in: ids } },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `${result.count} oferta(s) removida(s) da fila.`,
+      count: result.count,
+    });
+  } catch (error: any) {
+    console.error("Erro ao deletar da fila:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
