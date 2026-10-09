@@ -159,6 +159,12 @@ async function loadConfig() {
       const opts = groups.map((g) => `<option value="${g.id}">${g.name}</option>`).join('');
       groupSelect.innerHTML = opts;
       batchGroupSelect.innerHTML = opts;
+
+      const promoGroup = groups.find((g) => g.name.includes('PROMO MODA') || g.name.includes('BELEZA'));
+      if (promoGroup) {
+        groupSelect.value = promoGroup.id;
+        batchGroupSelect.value = promoGroup.id;
+      }
     } else {
       groupSelect.innerHTML = `<option value="">Grupo VIP Principal</option>`;
       batchGroupSelect.innerHTML = `<option value="">Grupo VIP Principal</option>`;
@@ -684,147 +690,217 @@ async function extractFromCurrentTab() {
   await loadServerConfig();
   await checkBackendConnection();
   await loadConfig();
-  loadTikTokConfig();
   await extractFromCurrentTab();
 })();
 
-// ==========================================
-// ABA TIKTOK AUTO-DM (100% GRATUITO)
-// ==========================================
-const tabOffers = document.getElementById('tabOffers');
-const tabTikTok = document.getElementById('tabTikTok');
-const offersContainer = document.getElementById('offersContainer');
-const tiktokContainer = document.getElementById('tiktokContainer');
 
-const tkToggleEnabled = document.getElementById('tkToggleEnabled');
-const tkSwitchBg = document.getElementById('tkSwitchBg');
-const tkSwitchKnob = document.getElementById('tkSwitchKnob');
-const tkStatusBadge = document.getElementById('tkStatusBadge');
-const tkInputGroupLink = document.getElementById('tkInputGroupLink');
-const tkInputDelayMinutes = document.getElementById('tkInputDelayMinutes');
-const tkCheckLike = document.getElementById('tkCheckLike');
-const tkInputKeywords = document.getElementById('tkInputKeywords');
-const tkCheckReply = document.getElementById('tkCheckReply');
-const tkInputReplyText = document.getElementById('tkInputReplyText');
-const tkInputDmText = document.getElementById('tkInputDmText');
-const tkSentCountText = document.getElementById('tkSentCountText');
-const tkQueueCountText = document.getElementById('tkQueueCountText');
-const btnSaveTkConfig = document.getElementById('btnSaveTkConfig');
-const btnOpenTikTokWeb = document.getElementById('btnOpenTikTokWeb');
+// =========================================================================
+// FERRAMENTAS: EXTRAIR LINKS DE PRODUTOS DA ABA ATUAL (MERCADO LIVRE / SHOPEE)
+// =========================================================================
+const btnExtractLinks = document.getElementById('btnExtractLinks');
+const extractLinksFeedback = document.getElementById('extractLinksFeedback');
+const extractLinksCountText = document.getElementById('extractLinksCountText');
 
-function switchMainTab(activeTab) {
-  if (activeTab === 'offers') {
-    tabOffers.style.borderBottomColor = '#ec4899';
-    tabOffers.style.color = '#fff';
-    tabTikTok.style.borderBottomColor = 'transparent';
-    tabTikTok.style.color = '#94a3b8';
-    offersContainer.classList.remove('hidden');
-    tiktokContainer.classList.add('hidden');
-  } else {
-    tabTikTok.style.borderBottomColor = '#ec4899';
-    tabTikTok.style.color = '#fff';
-    tabOffers.style.borderBottomColor = 'transparent';
-    tabOffers.style.color = '#94a3b8';
-    tiktokContainer.classList.remove('hidden');
-    offersContainer.classList.add('hidden');
-    loadTikTokConfig();
-  }
-}
+btnExtractLinks?.addEventListener('click', async () => {
+  btnExtractLinks.innerText = '⏳ Extraindo links...';
+  btnExtractLinks.style.opacity = '0.6';
 
-tabOffers?.addEventListener('click', () => switchMainTab('offers'));
-tabTikTok?.addEventListener('click', () => switchMainTab('tiktok'));
+  try {
+    if (typeof chrome !== 'undefined' && chrome.tabs && chrome.scripting) {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-function updateTkSwitchUI(enabled) {
-  if (!tkSwitchBg || !tkSwitchKnob || !tkStatusBadge) return;
-  if (enabled) {
-    tkSwitchBg.style.backgroundColor = '#ec4899';
-    tkSwitchKnob.style.transform = 'translateX(18px)';
-    tkStatusBadge.innerText = '● Ativo no TikTok Web (monitorando comentários)';
-    tkStatusBadge.style.color = '#22c55e';
-  } else {
-    tkSwitchBg.style.backgroundColor = '#3f3f46';
-    tkSwitchKnob.style.transform = 'translateX(0)';
-    tkStatusBadge.innerText = '⏸️ Automação Pausada';
-    tkStatusBadge.style.color = '#94a3b8';
-  }
-}
-
-tkToggleEnabled?.addEventListener('change', () => {
-  updateTkSwitchUI(tkToggleEnabled.checked);
-});
-
-function loadTikTokConfig() {
-  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
-
-  chrome.storage.local.get(['tiktokConfig', 'tiktokSentCountToday', 'tiktokProcessedUsers'], (res) => {
-    const cfg = res.tiktokConfig || {};
-    if (tkToggleEnabled) {
-      tkToggleEnabled.checked = cfg.enabled !== false;
-      updateTkSwitchUI(tkToggleEnabled.checked);
-    }
-
-    if (cfg.groupLink && tkInputGroupLink) tkInputGroupLink.value = cfg.groupLink;
-    if (cfg.delayMinutes && tkInputDelayMinutes) tkInputDelayMinutes.value = cfg.delayMinutes;
-    if (cfg.likeComment !== undefined && tkCheckLike) tkCheckLike.checked = cfg.likeComment;
-    if (cfg.keywords && tkInputKeywords) tkInputKeywords.value = Array.isArray(cfg.keywords) ? cfg.keywords.join(', ') : cfg.keywords;
-    if (cfg.replyInComments !== undefined && tkCheckReply) tkCheckReply.checked = cfg.replyInComments;
-    if (cfg.commentReplyText && tkInputReplyText) tkInputReplyText.value = cfg.commentReplyText;
-    if (cfg.dmMessageText && tkInputDmText) tkInputDmText.value = cfg.dmMessageText;
-
-    if (tkSentCountText) tkSentCountText.innerText = res.tiktokSentCountToday || 0;
-
-    // Tenta obter status da aba ativa do TikTok
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs && tabs[0] && tabs[0].url && tabs[0].url.includes('tiktok.com')) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'TIKTOK_GET_STATUS' }, (statusRes) => {
-          if (statusRes && statusRes.success) {
-            if (tkQueueCountText) tkQueueCountText.innerText = statusRes.queueCount || 0;
-            if (tkSentCountText) tkSentCountText.innerText = statusRes.sentCountToday || 0;
-          }
-        });
+      if (!activeTab || !activeTab.id) {
+        throw new Error('Nenhuma aba ativa identificada.');
       }
-    });
-  });
-}
 
-btnSaveTkConfig?.addEventListener('click', () => {
-  const keywordsArr = (tkInputKeywords ? tkInputKeywords.value : '')
-    .split(',')
-    .map((k) => k.trim())
-    .filter((k) => k.length > 0);
-
-  const cfg = {
-    enabled: tkToggleEnabled ? tkToggleEnabled.checked : true,
-    groupLink: tkInputGroupLink ? tkInputGroupLink.value.trim() : '',
-    delayMinutes: parseInt(tkInputDelayMinutes ? tkInputDelayMinutes.value : '2', 10) || 2,
-    likeComment: tkCheckLike ? tkCheckLike.checked : true,
-    keywords: keywordsArr,
-    replyInComments: tkCheckReply ? tkCheckReply.checked : true,
-    commentReplyText: tkInputReplyText ? tkInputReplyText.value.trim() : '',
-    dmMessageText: tkInputDmText ? tkInputDmText.value.trim() : '',
-  };
-
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.set({ tiktokConfig: cfg }, () => {
-      showFeedback('Configurações do TikTok salvas com sucesso!', 'success');
-
-      // Notifica abas do TikTok
-      chrome.tabs.query({ url: '*://*.tiktok.com/*' }, (tabs) => {
-        if (tabs && tabs.length > 0) {
-          tabs.forEach((tab) => {
-            chrome.tabs.sendMessage(tab.id, { action: 'TIKTOK_UPDATE_CONFIG', config: cfg });
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: activeTab.id },
+        func: async () => {
+          // 1. Rola suavemente para baixo para acionar o carregamento de todos os produtos com lazy-loading
+          await new Promise((resolve) => {
+            let totalHeight = 0;
+            const distance = 400;
+            let count = 0;
+            const maxScrolls = 15; // Rola até 15 vezes rapidamente
+            const timer = setInterval(() => {
+              window.scrollBy(0, distance);
+              totalHeight += distance;
+              count++;
+              if (count >= maxScrolls || (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 200) {
+                clearInterval(timer);
+                // Retorna ao topo suavemente
+                window.scrollTo({ top: 0, behavior: 'instant' });
+                setTimeout(resolve, 300);
+              }
+            }, 100);
           });
-        }
+
+          const links = new Set();
+          const items = [];
+          const seenUrls = new Set();
+
+          // 1. Puxa TODAS as ofertas já capturadas durante a rolagem (ex: as 81 ofertas acumuladas!)
+          if (window.__nanda_captured_offers && typeof window.__nanda_captured_offers.forEach === 'function') {
+            window.__nanda_captured_offers.forEach((val, key) => {
+              const clean = key.split('?')[0];
+              if (!seenUrls.has(clean)) {
+                seenUrls.add(clean);
+                links.add(val.originalUrl || val.affiliateUrl || key);
+                items.push({
+                  url: val.originalUrl || key,
+                  title: val.title,
+                  imageUrl: val.imageUrl,
+                  currentPrice: val.currentPrice,
+                  originalPrice: val.originalPrice,
+                  discountPercentage: val.discountPercentage,
+                  isFull: Boolean(val.shippingInfo?.includes('FULL')),
+                });
+              }
+            });
+          }
+
+          const cardSelectors = [
+            '.poly-card',
+            '.ui-search-result',
+            '.promotion-item',
+            '[class*="poly-component"]',
+            '.andes-card',
+            'li.ui-search-layout__item',
+            '.ui-search-layout li',
+            '[data-component="poly-card"]',
+            '.items__item',
+            '.ui-recommendations-card',
+            '.carousel__item'
+          ];
+
+          const cards = document.querySelectorAll(cardSelectors.join(', '));
+          cards.forEach((card) => {
+            const linkElem = card.querySelector('a.poly-component__title') ||
+              card.querySelector('a[href*="/p/MLB"]') ||
+              card.querySelector('a[href*="produto.mercadolivre.com.br/MLB"]') ||
+              card.querySelector('a.ui-search-link') ||
+              card.querySelector('a.ui-search-link__title-card') ||
+              card.querySelector('a.ui-search-item__group__element') ||
+              card.querySelector('a[href*="mercadolivre.com.br"]');
+            if (!linkElem) return;
+
+            let h = linkElem.href ? linkElem.href.split('#')[0] : '';
+            if (!h) return;
+            const cleanUrl = h.split('?')[0];
+
+            if (seenUrls.has(cleanUrl)) return;
+            seenUrls.add(cleanUrl);
+            links.add(h);
+
+            const title = (
+              card.querySelector('.poly-component__title') ||
+              card.querySelector('.ui-search-item__title') ||
+              card.querySelector('.ui-search-link__title-card') ||
+              linkElem
+            ).innerText.trim();
+            
+            // Procura a imagem real do Mercado Livre (incluindo lazy-loaded, data-src e srcset)
+            let imageUrl = '';
+            const allImgs = Array.from(card.querySelectorAll('img'));
+            for (const img of allImgs) {
+              const src = img.getAttribute('data-src') || img.src || img.getAttribute('data-srcset') || img.srcset || '';
+              if (src && (src.includes('mlstatic.com') || src.includes('http2.mlstatic') || src.startsWith('http'))) {
+                imageUrl = src.split(' ')[0].split(',')[0].trim();
+                break;
+              }
+            }
+
+            const frac = card.querySelector('.poly-price__current .andes-money-amount__fraction') || card.querySelector('.andes-money-amount__fraction');
+            const price = frac ? parseFloat(frac.innerText.replace(/\D/g, '')) : 0;
+            const discElem = card.querySelector('.poly-price__disc') || card.querySelector('[class*="discount"]');
+            const disc = discElem ? parseInt(discElem.innerText.replace(/\D/g, ''), 10) : 0;
+            const isFull = Boolean(card.querySelector('[class*="full"]') || card.innerText.includes('FULL'));
+
+            items.push({
+              url: h,
+              title,
+              imageUrl,
+              currentPrice: price,
+              discountPercentage: disc,
+              isFull,
+            });
+          });
+
+          // Fallback caso encontre links de produtos avulsos na página
+          document.querySelectorAll('a[href*="/p/MLB"], a[href*="MLB-"]').forEach((a) => {
+            let h = a.href;
+            if (!h) return;
+            h = h.split('#')[0];
+            const cleanUrl = h.split('?')[0];
+            if (!seenUrls.has(cleanUrl)) {
+              seenUrls.add(cleanUrl);
+              links.add(h);
+            }
+          });
+
+          // Une com todas as ofertas já acumuladas na memória do Harvester enquanto o usuário rolou a página
+          if (window.__nanda_captured_offers && typeof window.__nanda_captured_offers.forEach === 'function') {
+            window.__nanda_captured_offers.forEach((val, key) => {
+              const clean = key.split('?')[0];
+              if (!seenUrls.has(clean)) {
+                seenUrls.add(clean);
+                links.add(val.originalUrl || val.affiliateUrl || key);
+                items.push({
+                  url: val.originalUrl || key,
+                  title: val.title,
+                  imageUrl: val.imageUrl,
+                  currentPrice: val.currentPrice,
+                  originalPrice: val.originalPrice,
+                  discountPercentage: val.discountPercentage,
+                  isFull: Boolean(val.shippingInfo?.includes('FULL')),
+                });
+              }
+            });
+          }
+
+          return { links: Array.from(links), items };
+        },
       });
-    });
+
+      const extractedData = results && results[0] && results[0].result;
+      const links = extractedData?.links || [];
+      const items = extractedData?.items || [];
+
+      if (links.length > 0) {
+        // Envia para o cache do backend e aguarda gravação
+        if (items.length > 0) {
+          try {
+            await fetch(`${API_BASE}/api/marketplaces/mercadolivre/cache-products`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ items }),
+            });
+          } catch (e) {
+            console.error('Erro ao salvar cache:', e);
+          }
+        }
+
+        await navigator.clipboard.writeText(links.join('\n'));
+
+        if (extractLinksFeedback && extractLinksCountText) {
+          extractLinksCountText.innerText = links.length;
+          extractLinksFeedback.style.display = 'block';
+        }
+
+        showFeedback(`✓ ${links.length} link(s) de Mercado Livre copiado(s)!`, 'success');
+      } else {
+        showFeedback('Nenhum link de produto detectado nesta página.', 'error');
+      }
+    } else {
+      showFeedback('Ambiente de extensão não disponível.', 'error');
+    }
+  } catch (err) {
+    console.error('Erro ao extrair links:', err);
+    showFeedback('Falha ao extrair links da aba atual.', 'error');
+  } finally {
+    btnExtractLinks.innerText = '🔗 Extrair links de produtos da aba atual';
+    btnExtractLinks.style.opacity = '1';
   }
 });
 
-btnOpenTikTokWeb?.addEventListener('click', () => {
-  if (typeof chrome !== 'undefined' && chrome.tabs) {
-    chrome.tabs.create({ url: 'https://www.tiktok.com' });
-  } else {
-    window.open('https://www.tiktok.com', '_blank');
-  }
-});
 

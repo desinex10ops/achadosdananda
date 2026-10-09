@@ -138,7 +138,9 @@ model Group {
   categoryId         String
   category           GroupCategory      @relation(fields: [categoryId], references: [id])
   description        String?
-  platform           String             @default("WHATSAPP") // WHATSAPP, TELEGRAM
+  platform           String             @default("WHATSAPP") // WHATSAPP, TELEGRAM, EVOLUTION
+  whatsappJid        String?            // ex: 120363028394839@g.us (JID do grupo)
+  instanceName       String?            // ex: nanda-moda, nanda-casa (Instância Evolution)
   allowedHoursStart  String             @default("08:00")
   allowedHoursEnd    String             @default("22:00")
   maxOffersPerHour   Int                @default(2)
@@ -153,6 +155,33 @@ model Group {
   publicationGroups  PublicationGroup[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
+}
+
+model WhatsAppInstance {
+  id             String    @id @default(cuid())
+  name           String    @unique // ex: nanda-moda, nanda-casa, nanda-tech
+  label          String?   // ex: "Chip Moda & Beleza #1"
+  nicheSlug      String?   // moda, casa, tech, etc.
+  phone          String?   // ex: 5511999998888
+  status         String    @default("DISCONNECTED") // CONNECTED, CONNECTING, DISCONNECTED
+  qrCode         String?
+  lastSeenAt     DateTime?
+  dailySentCount Int       @default(0)
+  maxDailySends  Int       @default(250)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model OfferPublishHistory {
+  id          String   @id @default(cuid())
+  offerId     String
+  groupId     String
+  productHash String   // canonical SKU/ID para anti-repetição de 7 dias
+  publishedAt DateTime @default(now())
+  priceAtSend Float
+
+  @@index([groupId, productHash])
+  @@index([publishedAt])
 }
 
 model Lead {
@@ -289,179 +318,18 @@ model AuditLog {
   createdAt DateTime @default(now())
 }
 
-// ==========================================
-// MÓDULO DE AUTOMAÇÃO DE INSTAGRAM PROFISSIONAL
-// ==========================================
-
-model InstagramAccount {
-  id                  String                @id @default(cuid())
-  name                String                // ex: "@achadosdananda"
-  instagramId         String                @unique // Meta Instagram Business/Creator Account ID
-  facebookPageId      String?               // Facebook Page conectada
-  accessToken         String                // Meta Graph API Long-Lived Access Token
-  tokenExpiresAt      DateTime?
-  webhookSecret       String?
-  webhookVerified     Boolean               @default(false)
-  isActive            Boolean               @default(true)
-  rateLimitPerHour    Int                   @default(60)
-  rateLimitPerDay     Int                   @default(600)
-  operatingHoursStart String?               @default("08:00") // Formato "HH:mm"
-  operatingHoursEnd   String?               @default("22:00")
-  timezone            String                @default("America/Sao_Paulo")
-  automations         InstagramAutomation[]
-  logs                InstagramLog[]
-  jobs                InstagramJob[]
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-}
-
-model InstagramAutomation {
-  id                   String                 @id @default(cuid())
-  accountId            String
-  account              InstagramAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  name                 String
-  description          String?
-  isActive             Boolean                @default(true)
-  
-  // Gatilho
-  triggerType          String                 @default("COMMENT_ANY") // COMMENT_ANY, COMMENT_POST, COMMENT_REEL, STORY_REPLY, DIRECT_MESSAGE
-  targetMediaId        String?                // ID específico do post/reel ou null para qualquer publicação
-  targetMediaUrl       String?
-  
-  // Regras de correspondência de palavras-chave
-  matchType            String                 @default("CONTAINS") // EXACT, CONTAINS, STARTS_WITH, REGEX, ANY
-  keywords             String                 // Lista em JSON ou separada por vírgula: "EU QUERO, QUERO, LINK, PRECO"
-  caseSensitive        Boolean                @default(false)
-  ignoreAccents        Boolean                @default(true)
-  
-  // Resposta Pública (Comentário)
-  replyInPublic        Boolean                @default(true)
-  publicReplyTemplate  String?                @default("Oi @{username}! Enviamos o link detalhado no seu Direct 💖 Dá uma olhadinha!")
-  likeComment          Boolean                @default(true)
-  
-  // Resposta Privada (Direct Message)
-  sendDirectMessage    Boolean                @default(true)
-  dmMessageTemplate    String                 @default("Olá @{username}! Tudo bem?\n\nIdentificamos que você pediu o link da oferta:\n🔗 {link}\n\nAproveite antes que o preço suba ou o estoque acabe!")
-  dmButtonText         String?                @default("Ver Oferta")
-  dmButtonUrl          String?                // Se nulo, usa o {link}
-  
-  // Link e Campanha
-  affiliateLinkId      String?
-  customLink           String?
-  campaignCode         String?
-  
-  // Temporização e Humanização (Anti-ban)
-  delaySeconds         Int                    @default(15) // Atraso base em segundos
-  jitterSeconds        Int                    @default(10) // Variação aleatória (0 a jitterSeconds)
-  maxExecutionsPerUser Int                    @default(1) // Máximo de execuções por usuário nesta mídia
-  workingHoursOnly     Boolean                @default(false)
-  
-  // Tags a atribuir ao usuário
-  tagsToAdd            String?                // JSON ou CSV, ex: "interessado,shopee"
-  
-  // Métricas
-  totalTriggered       Int                    @default(0)
-  totalSuccess         Int                    @default(0)
-  totalFailed          Int                    @default(0)
-  
-  conditions           AutomationCondition[]
-  actions              AutomationAction[]
-  logs                 InstagramLog[]
-  jobs                 InstagramJob[]
-  
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
-}
-
-model AutomationCondition {
-  id           String              @id @default(cuid())
-  automationId String
-  automation   InstagramAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
-  type         String              // USER_NOT_TAGGED, USER_TAGGED, FIRST_TIME_USER, TIME_WINDOW, MEDIA_MATCH
-  operator     String              @default("EQUALS") // EQUALS, NOT_EQUALS, CONTAINS, NOT_CONTAINS
-  value        String              // ex: "vip", "08:00-22:00"
-  createdAt    DateTime            @default(now())
-}
-
-model AutomationAction {
-  id           String              @id @default(cuid())
-  automationId String
-  automation   InstagramAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
-  actionType   String              // SEND_DM, REPLY_COMMENT, LIKE_COMMENT, ADD_TAG, REMOVE_TAG, WEBHOOK_POST
-  order        Int                 @default(1)
-  payload      String              // JSON detalhado da ação
-  createdAt    DateTime            @default(now())
-}
-
-model InstagramJob {
-  id              String               @id @default(cuid())
-  accountId       String
-  account         InstagramAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  automationId    String?
-  automation      InstagramAutomation? @relation(fields: [automationId], references: [id], onDelete: SetNull)
-  idempotencyKey  String               @unique // Chave única para impedir envio duplicado: "acc:aut:comment:action"
-  actionType      String               // SEND_DM, REPLY_COMMENT, LIKE_COMMENT
-  status          String               @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED, SKIPPED
-  scheduledFor    DateTime             @default(now())
-  executedAt      DateTime?
-  retryCount      Int                  @default(0)
-  maxRetries      Int                  @default(3)
-  targetUserId    String               // IGSID do usuário no Instagram
-  targetUsername  String?
-  targetCommentId String?
-  targetMediaId   String?
-  payload         String               // JSON com texto, url, botões
-  errorMessage    String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-}
-
-model InstagramLog {
-  id                String               @id @default(cuid())
-  accountId         String
-  account           InstagramAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  automationId      String?
-  automation        InstagramAutomation? @relation(fields: [automationId], references: [id], onDelete: SetNull)
-  eventType         String               // WEBHOOK_RECEIVED, KEYWORD_MATCH, RULE_PASSED, RULE_FAILED, DM_SENT, REPLY_SENT, RATE_LIMIT_HIT, ERROR, SIMULATION
-  level             String               @default("INFO") // INFO, WARN, ERROR, SUCCESS
-  message           String
-  details           String?              // JSON com payload recebido ou dados de depuração
-  instagramUserId   String?
-  instagramUsername String?
-  commentId         String?
-  mediaId           String?
-  createdAt         DateTime             @default(now())
-}
-
-model InstagramUserTag {
-  id                String   @id @default(cuid())
-  instagramUserId   String
-  instagramUsername String?
-  tag               String
-  createdAt         DateTime @default(now())
-
-  @@unique([instagramUserId, tag])
-}
-
-model InstagramWebhookEvent {
-  id        String   @id @default(cuid())
-  eventId   String?
-  field     String   // "comments", "messages", "mentions"
-  payload   String   // JSON bruto
-  status    String   @default("PROCESSED") // RECEIVED, PROCESSED, IGNORED, FAILED
-  error     String?
-  createdAt DateTime @default(now())
-}
-
-model InstagramCampaign {
-  id               String   @id @default(cuid())
-  name             String
-  code             String   @unique
-  description      String?
-  totalClicks      Int      @default(0)
-  totalConversions Int      @default(0)
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+model GroupMirrorRule {
+  id                 String   @id @default(cuid())
+  sourceGroupName    String
+  sourceGroupId      String?
+  targetGroupId      String?
+  targetGroupName    String
+  style              String   @default("CLONE")
+  mediaFormat        String   @default("IMAGE")
+  intervalMinutes    Int      @default(0)
+  filterOfficialOnly Boolean  @default(true)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 

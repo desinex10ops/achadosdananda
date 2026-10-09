@@ -40,7 +40,7 @@ interface QueueItem {
     originalPrice: number;
     discountPercentage: number;
     marketplace: { name: string };
-    product: { imageUrl: string; name: string };
+    product: { imageUrl: string; name: string; category?: string };
   };
   template: { name: string; emoji: string };
   publicationGroups: Array<{
@@ -53,9 +53,21 @@ export default function QueuePage() {
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [selectedNiche, setSelectedNiche] = useState<string>("ALL");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+
+  // Piloto Automático / Auto-Disparador
+  const [isAutoPostActive, setIsAutoPostActive] = useState(false);
+  const [autoPostInterval, setAutoPostInterval] = useState(15); // minutos
+  const [countdown, setCountdown] = useState(15 * 60);
+
+  const formatCountdown = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -163,6 +175,50 @@ export default function QueuePage() {
     }
   };
 
+  // Execução do Piloto Automático no Navegador
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isAutoPostActive) {
+      timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            const nextPending = items.find((i) => i.status === "PENDING" || i.status === "SCHEDULED");
+            if (nextPending) {
+              handleWhatsAppDispatch(nextPending);
+            } else {
+              setIsAutoPostActive(false);
+              showToast("🎉 Todas as ofertas da fila foram disparadas!");
+            }
+            return autoPostInterval * 60;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isAutoPostActive, items, autoPostInterval]);
+
+  const toggleAutoPost = () => {
+    if (!isAutoPostActive) {
+      const pending = items.filter((i) => i.status === "PENDING" || i.status === "SCHEDULED");
+      if (pending.length === 0) {
+        showToast("⚠️ Nenhuma oferta pendente na fila para disparar.");
+        return;
+      }
+      
+      // Dispara a 1ª oferta imediatamente!
+      const nextPending = pending[0];
+      handleWhatsAppDispatch(nextPending);
+
+      setCountdown(autoPostInterval * 60);
+      setIsAutoPostActive(true);
+      showToast(`🤖 Piloto Automático ativado! 1ª oferta disparada agora. Próximas a cada ${autoPostInterval} min.`);
+    } else {
+      setIsAutoPostActive(false);
+      showToast("⏸️ Piloto Automático pausado.");
+    }
+  };
+
   const handlePublishNow = async (id: string) => {
     try {
       const res = await fetch(`/api/queue/${id}`, {
@@ -256,8 +312,22 @@ export default function QueuePage() {
   };
 
   const filteredItems = items.filter((item) => {
-    if (filterStatus === "ALL") return true;
-    return item.status === filterStatus;
+    if (filterStatus !== "ALL" && item.status !== filterStatus) return false;
+    if (selectedNiche !== "ALL") {
+      const cat = (
+        item.publicationGroups[0]?.group?.category?.name ||
+        item.offer?.product?.category ||
+        item.offer?.title ||
+        ""
+      ).toLowerCase();
+      
+      if (selectedNiche === "MODA" && !cat.includes("moda") && !cat.includes("beleza") && !cat.includes("roupa") && !cat.includes("vest") && !cat.includes("batom") && !cat.includes("perfum")) return false;
+      if (selectedNiche === "CASA" && !cat.includes("casa") && !cat.includes("cozinha") && !cat.includes("panela") && !cat.includes("decor") && !cat.includes("air fryer") && !cat.includes("cama")) return false;
+      if (selectedNiche === "TECH" && !cat.includes("tech") && !cat.includes("fone") && !cat.includes("celular") && !cat.includes("gamer") && !cat.includes("monitor") && !cat.includes("pc")) return false;
+      if (selectedNiche === "BEBE" && !cat.includes("bebê") && !cat.includes("bebe") && !cat.includes("fralda") && !cat.includes("infantil") && !cat.includes("criança")) return false;
+      if (selectedNiche === "MERCADO" && !cat.includes("mercado") && !cat.includes("limpeza") && !cat.includes("pet") && !cat.includes("ração") && !cat.includes("sabão")) return false;
+    }
+    return true;
   });
 
   const pendingCount = items.filter((i) => i.status === "PENDING" || i.status === "SCHEDULED").length;
@@ -298,6 +368,120 @@ export default function QueuePage() {
             <span>Adicionar Oferta à Fila</span>
           </Link>
         </div>
+      </div>
+
+      {/* Painel do Piloto Automático / Auto-Disparador */}
+      <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/30 via-slate-900 to-slate-950 p-5 text-white shadow-lg">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div
+              className={`p-3 rounded-2xl flex items-center justify-center transition-all ${
+                isAutoPostActive
+                  ? "bg-emerald-500/20 text-emerald-400 ring-2 ring-emerald-500/50 animate-pulse"
+                  : "bg-slate-800 text-slate-400"
+              }`}
+            >
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-white">🤖 Piloto Automático da Fila</h2>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                    isAutoPostActive
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : "bg-slate-800 text-slate-400"
+                  }`}
+                >
+                  {isAutoPostActive ? "ATIVO & DISPARANDO" : "PAUSADO"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Dispara automaticamente as {pendingCount} ofertas no grupo <strong>PROMO MODA & BELEZA #4</strong> respeitando intervalos anti-ban.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {/* Seletor de Intervalo */}
+            <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 rounded-xl px-3 py-1.5">
+              <Clock className="h-4 w-4 text-slate-400" />
+              <span className="text-xs text-slate-300">Intervalo:</span>
+              <select
+                value={autoPostInterval}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setAutoPostInterval(val);
+                  setCountdown(val * 60);
+                }}
+                disabled={isAutoPostActive}
+                className="bg-transparent text-xs font-bold text-emerald-400 focus:outline-none cursor-pointer"
+              >
+                <option value={5} className="bg-slate-900 text-white">5 min (teste rápido)</option>
+                <option value={10} className="bg-slate-900 text-white">10 min</option>
+                <option value={15} className="bg-slate-900 text-white">15 min (recomendado)</option>
+                <option value={20} className="bg-slate-900 text-white">20 min</option>
+                <option value={30} className="bg-slate-900 text-white">30 min (super seguro)</option>
+              </select>
+            </div>
+
+            {/* Contador regressivo se ativo */}
+            {isAutoPostActive && (
+              <div className="flex items-center gap-2 bg-emerald-950/40 border border-emerald-500/40 rounded-xl px-3 py-1.5 text-xs text-emerald-300 font-mono font-bold">
+                <Clock className="h-4 w-4 animate-spin text-emerald-400" />
+                <span>Próximo em: {formatCountdown(countdown)}</span>
+              </div>
+            )}
+
+            {/* Botão de Toggle */}
+            <button
+              onClick={toggleAutoPost}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 active:scale-95 ${
+                isAutoPostActive
+                  ? "bg-amber-500 hover:bg-amber-600 text-slate-950"
+                  : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/25"
+              }`}
+            >
+              {isAutoPostActive ? (
+                <>
+                  <Pause className="h-4 w-4 fill-current" />
+                  <span>Pausar Piloto Automático</span>
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 fill-current" />
+                  <span>Iniciar Piloto Automático</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Seletor de Nichos */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        <span className="text-slate-400 font-semibold mr-1 shrink-0">Filtrar por Nicho:</span>
+        {[
+          { id: "ALL", label: "Todos os Nichos", emoji: "✨" },
+          { id: "MODA", label: "Moda & Beleza", emoji: "👗" },
+          { id: "CASA", label: "Casa & Cozinha", emoji: "🏠" },
+          { id: "TECH", label: "Tech & Setup", emoji: "💻" },
+          { id: "BEBE", label: "Bebê & Infantil", emoji: "🍼" },
+          { id: "MERCADO", label: "Mercado & Pet", emoji: "🛒" },
+        ].map((niche) => (
+          <button
+            key={niche.id}
+            onClick={() => setSelectedNiche(niche.id)}
+            className={`rounded-xl px-3 py-1.5 font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+              selectedNiche === niche.id
+                ? "bg-slate-900 text-white shadow-xs"
+                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <span>{niche.emoji}</span>
+            <span>{niche.label}</span>
+          </button>
+        ))}
       </div>
 
       {/* Filter Tabs */}

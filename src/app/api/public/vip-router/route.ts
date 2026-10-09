@@ -13,6 +13,17 @@ export async function GET(req: NextRequest) {
     const userAgent = req.headers.get("user-agent") || undefined;
     const ipAddress = req.headers.get("x-forwarded-for") || undefined;
 
+    const niche = searchParams.get("niche") || searchParams.get("category");
+    const nicheFilter: any = {};
+    if (niche) {
+      nicheFilter.category = {
+        OR: [
+          { slug: { contains: niche.toLowerCase() } },
+          { name: { contains: niche.toLowerCase() } },
+        ],
+      };
+    }
+
     // Busca o primeiro grupo VIP ativo com vagas disponíveis
     let targetGroup = await prisma.group.findFirst({
       where: {
@@ -20,6 +31,7 @@ export async function GET(req: NextRequest) {
         isActive: true,
         platform: "WHATSAPP",
         inviteLink: { not: null },
+        ...nicheFilter,
       },
       orderBy: [
         { priority: "asc" },
@@ -36,6 +48,7 @@ export async function GET(req: NextRequest) {
           platform: "WHATSAPP",
           inviteLink: { not: null },
           currentClicks: { lt: targetGroup.maxMembers },
+          ...nicheFilter,
         },
         orderBy: [
           { priority: "asc" },

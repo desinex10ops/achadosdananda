@@ -17,5 +17,45 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: achados_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  evolution_api:
+    image: atendai/evolution-api:v2.1.2
+    container_name: achados_evolution_api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_URL: http://localhost:8080
+      AUTHENTICATION_API_KEY: nanda_evolution_secret_key_2026
+      DATABASE_ENABLED: "true"
+      DATABASE_CONNECTION_URI: postgresql://postgres:postgrespassword@postgres:5432/achados_nanda
+      DATABASE_CLIENT_NAME: evolution_exchange
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/1
+      CACHE_REDIS_PREFIX_KEY: evolution
+      WA_BUSINESS_TOKEN_WEBHOOK: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - evolution_instances:/evolution/instances
+
 volumes:
   postgres_data:
+  redis_data:
+  evolution_instances:

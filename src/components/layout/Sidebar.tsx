@@ -22,8 +22,11 @@ import {
   ListOrdered,
   Sparkles,
   X,
-  Instagram,
   Zap,
+  ShoppingBag,
+  Radio,
+  Smartphone,
+  GitFork,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,15 +38,12 @@ interface SidebarProps {
 export function Sidebar({ isOpenMobile, onCloseMobile }: SidebarProps) {
   const pathname = usePathname();
   const [offersOpen, setOffersOpen] = useState(true);
-  const [instagramOpen, setInstagramOpen] = useState(true);
 
   const isOffersActive =
     pathname.startsWith("/offers") ||
     pathname === "/radar" ||
     pathname === "/queue" ||
     pathname === "/history";
-
-  const isInstagramActive = pathname.startsWith("/instagram");
 
   const navigation = [
     {
@@ -53,20 +53,16 @@ export function Sidebar({ isOpenMobile, onCloseMobile }: SidebarProps) {
       active: pathname === "/",
     },
     {
-      name: "Instagram Auto",
-      icon: Instagram,
-      isSubmenu: true,
-      isOpen: instagramOpen,
-      toggle: () => setInstagramOpen(!instagramOpen),
-      active: isInstagramActive,
-      children: [
-        { name: "Painel Instagram", href: "/instagram", icon: Instagram },
-        { name: "Criar Automação", href: "/instagram/builder", icon: PlusCircle, highlight: true },
-        { name: "Regras Ativas", href: "/instagram/automations", icon: Zap },
-        { name: "Fila de Disparo", href: "/instagram/queue", icon: ListOrdered },
-        { name: "Logs & Auditoria", href: "/instagram/logs", icon: History },
-        { name: "Contas Conectadas", href: "/instagram/accounts", icon: Users },
-      ],
+      name: "Buscar Produtos",
+      href: "/buscar",
+      icon: ShoppingBag,
+      active: pathname === "/buscar",
+    },
+    {
+      name: "Espelhamento",
+      href: "/espelhamento",
+      icon: Radio,
+      active: pathname === "/espelhamento",
     },
     {
       name: "Ofertas",
@@ -94,6 +90,18 @@ export function Sidebar({ isOpenMobile, onCloseMobile }: SidebarProps) {
       href: "/groups",
       icon: Users,
       active: pathname === "/groups",
+    },
+    {
+      name: "Chips & Conexões",
+      href: "/conexoes",
+      icon: Smartphone,
+      active: pathname === "/conexoes",
+    },
+    {
+      name: "Transbordo VIP",
+      href: "/transbordo",
+      icon: GitFork,
+      active: pathname === "/transbordo",
     },
     {
       name: "Templates",

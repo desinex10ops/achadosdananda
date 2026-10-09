@@ -14,7 +14,8 @@ export interface DistributionPayload {
   imageUrl?: string;
   targetChannelId?: string;
   targetChannelName?: string;
-  platform: "WHATSAPP" | "TELEGRAM" | "WEBHOOK";
+  instanceName?: string;
+  platform: "WHATSAPP" | "TELEGRAM" | "WEBHOOK" | "EVOLUTION";
 }
 
 export interface DistributionResult {
@@ -137,9 +138,57 @@ export class TelegramDistributionAdapter implements DistributionAdapter {
   }
 }
 
+/**
+ * 4. Evolution API (Cluster Headless com Múltiplos Números / Chips)
+ */
+export class EvolutionDistributionAdapter implements DistributionAdapter {
+  async distribute(payload: DistributionPayload): Promise<DistributionResult> {
+    try {
+      const { EvolutionClient } = await import("./evolution");
+      const client = new EvolutionClient();
+      
+      const targetJid = payload.targetChannelId || "";
+      if (!targetJid) {
+        return {
+          success: false,
+          errorMessage: "JID do grupo de destino não informado (ex: 12036302...@g.us).",
+        };
+      }
+
+      let res;
+      if (payload.imageUrl) {
+        res = await client.sendMedia({
+          targetJid,
+          messageText: payload.messageText,
+          imageUrl: payload.imageUrl,
+          instanceName: payload.instanceName,
+        });
+      } else {
+        res = await client.sendText({
+          targetJid,
+          messageText: payload.messageText,
+          instanceName: payload.instanceName,
+        });
+      }
+
+      return {
+        success: true,
+        externalMessageId: res?.key?.id || `EVO-${Date.now()}`,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        errorMessage: `Erro Evolution API: ${err.message}`,
+      };
+    }
+  }
+}
+
 // Factory para obter o adapter apropriado
-export function getDistributionAdapter(platform: "WHATSAPP" | "TELEGRAM" | "WEBHOOK"): DistributionAdapter {
+export function getDistributionAdapter(platform: "WHATSAPP" | "TELEGRAM" | "WEBHOOK" | "EVOLUTION"): DistributionAdapter {
   switch (platform) {
+    case "EVOLUTION":
+      return new EvolutionDistributionAdapter();
     case "TELEGRAM":
       return new TelegramDistributionAdapter();
     case "WEBHOOK":
