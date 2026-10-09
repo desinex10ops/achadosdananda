@@ -25,40 +25,70 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Publicação não encontrada." }, { status: 404 });
     }
 
-    // 1. Determina o JID do canal de destino e a instância
-    const firstGroup = publication.publicationGroups[0]?.group;
-    let targetChannelId = firstGroup?.whatsappJid || body.targetChannelId || "";
-    let instanceName = firstGroup?.instanceName || body.instanceName || process.env.EVOLUTION_DEFAULT_INSTANCE || "nanda-principal";
+    // 1. Determina todos os grupos de destino vinculados à publicação
+    let targetGroups = publication.publicationGroups
+      .map((pg) => pg.group)
+      .filter((g) => g && g.whatsappJid && g.isActive);
 
-    if (!targetChannelId) {
-      // Busca grupo ativo com JID cadastrado
-      const groupWithJid = await prisma.group.findFirst({
-        where: { whatsappJid: { not: null } },
+    if (body.targetChannelId) {
+      targetGroups = [
+        {
+          id: "custom",
+          name: "Canal Personalizado",
+          whatsappJid: body.targetChannelId,
+          instanceName: body.instanceName || process.env.EVOLUTION_DEFAULT_INSTANCE || "nanda-principal",
+        } as any,
+      ];
+    } else if (targetGroups.length === 0) {
+      const activeGroups = await prisma.group.findMany({
+        where: { whatsappJid: { not: null }, isActive: true },
       });
-      if (groupWithJid?.whatsappJid) {
-        targetChannelId = groupWithJid.whatsappJid;
-      }
+      targetGroups = activeGroups as any;
     }
 
-    if (!targetChannelId && platform === "EVOLUTION") {
+    if (targetGroups.length === 0 && platform === "EVOLUTION") {
       return NextResponse.json({
         success: false,
-        error: "Grupo do WhatsApp não possui JID cadastrado (ex: 120363429708443665@g.us).",
+        error: "Nenhum grupo do WhatsApp com JID cadastrado foi encontrado.",
       }, { status: 400 });
     }
 
-    // 2. Executa disparo via Adapter
+    // 2. Executa disparo via Adapter para cada grupo
     const adapter = getDistributionAdapter(platform as any);
-    const result = await adapter.distribute({
-      messageText: publication.generatedText,
-      imageUrl: publication.offer.product.imageUrl,
-      targetChannelId,
-      instanceName,
-      platform: platform as any,
-    });
+    const dispatchResults: any[] = [];
+    let atLeastOneSuccess = false;
 
-    // 3. Se sucesso, atualiza o status de publicação no banco
-    if (result.success) {
+    for (const group of targetGroups) {
+      const channelJid = group.whatsappJid!;
+      const instance = group.instanceName || process.env.EVOLUTION_DEFAULT_INSTANCE || "nanda-principal";
+
+      const res = await adapter.distribute({
+        messageText: publication.generatedText,
+        imageUrl: publication.offer.product.imageUrl,
+        targetChannelId: channelJid,
+        instanceName: instance,
+        platform: platform as any,
+      });
+
+      dispatchResults.push({
+        groupName: group.name,
+        targetChannelId: channelJid,
+        success: res.success,
+        error: res.errorMessage,
+      });
+
+      if (res.success) {
+        atLeastOneSuccess = true;
+      }
+
+      // Pequena pausa amigável entre envios para evitar rate limit
+      if (targetGroups.length > 1) {
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
+
+    // 3. Se pelo menos um grupo teve sucesso, atualiza o status de publicação no banco
+    if (atLeastOneSuccess) {
       await prisma.publication.update({
         where: { id: publication.id },
         data: {
@@ -82,16 +112,21 @@ export async function POST(request: Request) {
     }
 
     // 4. Grava no AuditLog
+    const groupNames = targetGroups.map((g) => g.name).join(", ");
     await prisma.auditLog.create({
       data: {
         action: "DISPATCH_OFFER",
         module: "DISTRIBUTION",
-        details: `Disparo direto da oferta ${publication.offer.title} via ${platform} para ${targetChannelId}. Sucesso: ${result.success}`,
-        status: result.success ? "SUCCESS" : "ERROR",
+        details: `Disparo da oferta ${publication.offer.title} via ${platform} para [${groupNames}]. Sucesso: ${atLeastOneSuccess}`,
+        status: atLeastOneSuccess ? "SUCCESS" : "ERROR",
       },
     });
 
-    return NextResponse.json({ success: result.success, data: result, error: result.errorMessage });
+    return NextResponse.json({
+      success: atLeastOneSuccess,
+      results: dispatchResults,
+      data: dispatchResults[0],
+    });
   } catch (error: any) {
     console.error("Erro na distribuição:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

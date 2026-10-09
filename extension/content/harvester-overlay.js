@@ -15,7 +15,7 @@
   const capturedOffers = new Map();
   window.__nanda_captured_offers = capturedOffers;
   let isAutoScrollActive = true;
-  let backendUrl = 'http://localhost:3000';
+  let backendUrl = 'https://achadosdananda.vercel.app';
   let affiliateTags = {
     amazon: 'achadosnanda-20',
     'mercado-livre': 'meli-achadosnanda',

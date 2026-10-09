@@ -225,24 +225,28 @@ export default function BuscarProdutosPage() {
       } catch (e) {}
     }
 
-    const lines = meliLinksInput.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    setMeliBatchProgress(`Processando lote 1 de 1 (${lines.length} links)...`);
+    // 2. Extrai links do texto ou linhas
+    const urlRegex = /(?:https?:\/\/)?(?:[a-zA-Z0-9-]+\.)?(?:mercadolivre\.com\.br|mercadolibre\.com|meli\.la)\/[^\s"'<>()[\]]+/gi;
+    const matches = rawInput.match(urlRegex) || [];
+    const targetLinks = matches.length > 0 ? Array.from(new Set(matches)) : rawInput.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+    setMeliBatchProgress(`Carregando fotos e ofertas reais (${targetLinks.length} item(ns))...`);
 
     try {
       const res = await fetch("/api/marketplaces/mercadolivre/scrape-links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ links: lines }),
+        body: JSON.stringify({ links: targetLinks, text: rawInput }),
       });
 
       const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
         setMeliProducts(json.data);
         // Seleciona todos por padrão
         setSelectedMeliIds(new Set(json.data.map((p: any) => p.id)));
-        showToast(`✅ ${json.data.length} produtos do Mercado Livre carregados com sucesso!`);
+        showToast(`✅ ${json.data.length} produto(s) do Mercado Livre com fotos reais carregados!`);
       } else {
-        showToast("❌ Erro ao processar links: " + (json.error || "Tente novamente"));
+        showToast("❌ " + (json.error || "Nenhum produto pôde ser extraído dos links."));
       }
     } catch (err: any) {
       showToast("❌ Erro ao conectar com o serviço do Mercado Livre.");

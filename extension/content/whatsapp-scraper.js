@@ -21,7 +21,7 @@
   const harvestedOffersCache = new Map();
 
   // Configuração de URL do servidor
-  let backendUrl = 'http://localhost:3000';
+  let backendUrl = 'https://achadosdananda.vercel.app';
 
   // Carrega configurações do storage da extensão
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
