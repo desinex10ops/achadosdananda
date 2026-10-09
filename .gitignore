@@ -43,3 +43,6 @@ prisma/dev.db-journal
 
 # backup / temporary folders
 achadinho-pro (1)
+
+.vercel
+.env*

@@ -1,5 +1,52 @@
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 
+export const DYNAMIC_OPENERS = [
+  "✨ Meninas, olha esse achadinho imperdível!",
+  "🔥 Baixou muito agora! Corre antes que esgote:",
+  "😱 Gente, que preço surreal nesse produto:",
+  "💖 Mais um achadinho aprovado da Nanda pra vocês:",
+  "⚡ Super oportunidade com desconto exclusivo:",
+  "🚨 Alerta de oferta relâmpago! Vale muito a pena:",
+];
+
+export function getRandomOpener(): string {
+  return DYNAMIC_OPENERS[Math.floor(Math.random() * DYNAMIC_OPENERS.length)];
+}
+
+export function parseSpintax(text: string): string {
+  if (!text) return "";
+  const spintaxRegex = /\{([^{}]+)\}/g;
+  let matches = true;
+  let result = text;
+  let iterations = 0;
+  while (matches && iterations < 5) {
+    iterations++;
+    const prev = result;
+    result = result.replace(spintaxRegex, (match, choices) => {
+      if ([
+        "TITULO",
+        "CHAMADA",
+        "PRECO_DE",
+        "PRECO_POR",
+        "DESCONTO",
+        "VALOR_ECONOMIZADO",
+        "CUPOM",
+        "FRETE",
+        "LINK",
+        "CTA",
+        "RODAPE",
+      ].includes(choices)) {
+        return match;
+      }
+      const parts = choices.split("|");
+      if (parts.length <= 1) return match;
+      return parts[Math.floor(Math.random() * parts.length)];
+    });
+    matches = result !== prev && /\{[^{}]+\|/.test(result);
+  }
+  return result;
+}
+
 export interface OfferDataForTemplate {
   title: string;
   callout?: string | null;
@@ -51,7 +98,7 @@ export function generateOfferMessage(offer: OfferDataForTemplate, template: Temp
   const link = offer.affiliateUrl || offer.originalUrl || "";
   const cta = template.cta || "👇 COMPRE PELO LINK ABAIXO:";
   const rodape = template.footer || "";
-  const chamada = offer.callout ? `✨ ${offer.callout}` : "";
+  const chamada = offer.callout ? `✨ ${offer.callout}` : getRandomOpener();
 
   let result = template.structure;
 
@@ -80,6 +127,7 @@ export function generateOfferMessage(offer: OfferDataForTemplate, template: Temp
       return true;
     });
 
-  // Condense multiple empty lines into at most 2
-  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  // Condense multiple empty lines into at most 2 and parse spintax
+  const finalMessage = lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return parseSpintax(finalMessage);
 }

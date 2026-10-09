@@ -80,6 +80,7 @@ export default function QueuePage() {
   const [bulkStartTime, setBulkStartTime] = useState<string>("");
   const [bulkIntervalMinutes, setBulkIntervalMinutes] = useState(8);
   const [isSavingBulkSchedule, setIsSavingBulkSchedule] = useState(false);
+  const [isRefilling, setIsRefilling] = useState(false);
 
   const formatCountdown = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -458,6 +459,25 @@ export default function QueuePage() {
     }
   };
 
+  const handleAutoRefill = async () => {
+    setIsRefilling(true);
+    showToast("🔍 Buscando ofertas em alta para abastecer a fila...");
+    try {
+      const res = await fetch("/api/cron/auto-refill?force=true", { method: "POST" });
+      const data = await res.json();
+      if (data.success && data.addedCount > 0) {
+        showToast(`🎉 ${data.addedCount} novas ofertas foram adicionadas à fila com sucesso!`);
+        fetchQueue();
+      } else {
+        showToast(`⚠️ ${data.message || "Fila já possui ofertas suficientes."}`);
+      }
+    } catch (err) {
+      showToast("❌ Erro ao reabastecer a fila.");
+    } finally {
+      setIsRefilling(false);
+    }
+  };
+
   const handleTogglePause = async (id: string, currentStatus: string) => {
     const action = currentStatus === "PAUSED" ? "RESUME" : "PAUSE";
     try {
@@ -582,7 +602,15 @@ export default function QueuePage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleAutoRefill}
+            disabled={isRefilling}
+            className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-xs font-bold text-emerald-800 shadow-xs hover:bg-emerald-100 transition-colors disabled:opacity-50"
+          >
+            <Sparkles className="h-4 w-4 text-emerald-600" />
+            <span>{isRefilling ? "Reabastecendo..." : "Auto-Reabastecer Fila"}</span>
+          </button>
           <button
             onClick={handleOpenBulkReschedule}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition-colors"

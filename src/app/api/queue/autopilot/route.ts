@@ -192,12 +192,17 @@ export async function POST(request: Request) {
         }
       }
 
-      // 3. Reagenda todas as ofertas restantes para o futuro a cada X minutos na nuvem
+      // 3. Reagenda todas as ofertas restantes para o futuro a cada X minutos na nuvem (com variação humanizada)
       const remainingItems = dispatchedFirst ? pendingItems.slice(1) : pendingItems;
 
+      let accumulatedMinutes = 0;
       for (let i = 0; i < remainingItems.length; i++) {
         const item = remainingItems[i];
-        const nextTime = new Date(scheduledCursor.getTime() + (i + 1) * intervalMinutes * 60 * 1000);
+        // Humanização: adiciona jitter de -1 a +2 minutos para evitar padrão robótico
+        const jitter = Math.floor(Math.random() * 4) - 1; 
+        const stepMinutes = Math.max(3, intervalMinutes + jitter);
+        accumulatedMinutes += stepMinutes;
+        const nextTime = new Date(scheduledCursor.getTime() + accumulatedMinutes * 60 * 1000);
 
         await prisma.publication.update({
           where: { id: item.id },

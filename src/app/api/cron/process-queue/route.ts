@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getDistributionAdapter } from "@/modules/distribution/adapter";
+import { parseSpintax } from "@/modules/templates/engine";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Endpoint de Cron Job 24/7 na Nuvem:
- * Processa a fila de ofertas agendadas que já chegaram no horário e faz o disparo
- * 100% automático no WhatsApp (Grupo 4 e Grupo 5), mesmo com o computador desligado.
+ * Endpoint de Cron Job 24/7 na Nuvem com:
+ * 1. Disparo de ofertas agendadas via WhatsApp
+ * 2. Rastreamento inteligente de cliques com link próprio (/r/[id])
+ * 3. Humanização anti-ban com atraso aleatório e spintax
+ * 4. Alerta automático de fila baixa no WhatsApp da Nanda
  */
 export async function GET(request: Request) {
   return handleProcessQueue();
@@ -24,7 +27,6 @@ async function handleProcessQueue() {
     // 1. Obtém configurações do Piloto Automático
     const settings = await prisma.settings.findFirst();
     const isAutopilotActive = settings?.autopilotActive ?? false;
-    const autopilotInterval = settings?.autopilotInterval ?? 8;
 
     // 2. Busca ofertas agendadas cujo horário já chegou ou passou
     let duePublications = await prisma.publication.findMany({
@@ -41,7 +43,7 @@ async function handleProcessQueue() {
         },
       },
       orderBy: { scheduledFor: "asc" },
-      take: 3, // Processa até 3 ofertas por ciclo para cadência natural
+      take: 2, // Processa até 2 ofertas por ciclo para cadência natural
     });
 
     // Se o piloto automático estiver ativo e não houver itens com horário vencido,
@@ -62,6 +64,9 @@ async function handleProcessQueue() {
     }
 
     if (duePublications.length === 0) {
+      // Verifica alerta de fila baixa mesmo quando nada foi disparado
+      await checkAndNotifyLowQueue();
+
       return NextResponse.json({
         success: true,
         message: "Nenhuma oferta com horário pendente para este minuto.",
@@ -72,6 +77,7 @@ async function handleProcessQueue() {
 
     const adapter = getDistributionAdapter("EVOLUTION");
     const results: any[] = [];
+    const siteUrl = process.env.NEXTAUTH_URL || "https://achadosdananda.vercel.app";
 
     for (const pub of duePublications) {
       // 3. Busca grupos vinculados ativos
@@ -90,13 +96,31 @@ async function handleProcessQueue() {
       let pubSuccess = false;
       let lastErrorMessage = "";
 
+      // 4. Converte links para o rastreador próprio /r/{offerId} e aplica Spintax
+      const trackedLink = `${siteUrl}/r/${pub.offerId}`;
+      let messageToSend = pub.generatedText;
+
+      if (!messageToSend.includes("/r/")) {
+        const originalAffiliate = pub.offer.affiliateUrl || pub.offer.originalUrl;
+        if (originalAffiliate && messageToSend.includes(originalAffiliate)) {
+          messageToSend = messageToSend.replace(originalAffiliate, trackedLink);
+        } else {
+          messageToSend = messageToSend.replace(/https?:\/\/[^\s]+/g, (url) => {
+            return url.includes("/r/") ? url : trackedLink;
+          });
+        }
+      }
+
+      // Humanização anti-ban: processa spintax no texto da mensagem
+      messageToSend = parseSpintax(messageToSend);
+
       for (const group of targetGroups) {
         const channelJid = group.whatsappJid!;
         const instance = group.instanceName || process.env.EVOLUTION_DEFAULT_INSTANCE || "nanda-principal";
 
         try {
           const res = await adapter.distribute({
-            messageText: pub.generatedText,
+            messageText: messageToSend,
             imageUrl: pub.offer.product.imageUrl,
             targetChannelId: channelJid,
             instanceName: instance,
@@ -129,11 +153,12 @@ async function handleProcessQueue() {
           });
         }
 
-        // Intervalo de segurança anti-ban do WhatsApp entre mensagens
-        await new Promise((r) => setTimeout(r, 2000));
+        // Intervalo humanizado com jitter aleatório entre mensagens (anti-ban)
+        const randomizedDelay = 2000 + Math.floor(Math.random() * 2500);
+        await new Promise((r) => setTimeout(r, randomizedDelay));
       }
 
-      // 4. Marca como publicada se disparada com sucesso
+      // 5. Marca como publicada se disparada com sucesso
       if (pubSuccess) {
         await prisma.publication.update({
           where: { id: pub.id },
@@ -166,11 +191,11 @@ async function handleProcessQueue() {
           },
         });
       } else {
-        // Se falhou, adia em 3 minutos para não travar a fila e registra o erro
+        // Se falhou, adia em 4 minutos para não travar a fila e registra o erro
         await prisma.publication.update({
           where: { id: pub.id },
           data: {
-            scheduledFor: new Date(Date.now() + 3 * 60 * 1000),
+            scheduledFor: new Date(Date.now() + 4 * 60 * 1000),
             errorMessage: lastErrorMessage,
           },
         });
@@ -186,7 +211,7 @@ async function handleProcessQueue() {
       }
     }
 
-    // 5. Atualiza registro de última execução nas configurações
+    // 6. Atualiza registro de última execução nas configurações
     if (settings?.userId) {
       await prisma.settings.update({
         where: { userId: settings.userId },
@@ -195,6 +220,9 @@ async function handleProcessQueue() {
         },
       });
     }
+
+    // 7. Checa e envia alerta de fila baixa se necessário
+    await checkAndNotifyLowQueue();
 
     return NextResponse.json({
       success: true,
@@ -205,5 +233,49 @@ async function handleProcessQueue() {
   } catch (error: any) {
     console.error("Erro no processamento da fila automática:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+/**
+ * Função de monitoramento de fila baixa:
+ * Dispara notificação no painel e WhatsApp se houver menos de 10 ofertas
+ */
+async function checkAndNotifyLowQueue() {
+  try {
+    const remainingCount = await prisma.publication.count({
+      where: { status: { in: ["PENDING", "SCHEDULED"] } },
+    });
+
+    if (remainingCount <= 10 && remainingCount > 0) {
+      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+      const recentAlert = await prisma.auditLog.findFirst({
+        where: {
+          action: "LOW_QUEUE_ALERT",
+          createdAt: { gte: fourHoursAgo },
+        },
+      });
+
+      if (!recentAlert) {
+        await prisma.notification.create({
+          data: {
+            title: "⚠️ Fila de Ofertas Baixa",
+            message: `Restam apenas ${remainingCount} ofertas na fila. Reabasteça no painel para não interromper os envios!`,
+            type: "WARNING",
+            link: "/queue",
+          },
+        });
+
+        await prisma.auditLog.create({
+          data: {
+            action: "LOW_QUEUE_ALERT",
+            module: "DISTRIBUTION",
+            details: `Alerta registrado: ${remainingCount} ofertas restantes na fila.`,
+            status: "SUCCESS",
+          },
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Erro na verificação de fila baixa:", err);
   }
 }
