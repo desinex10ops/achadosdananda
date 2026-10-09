@@ -23,7 +23,7 @@ export interface ShopeeProductItem {
 export interface ShopeeSearchParams {
   keyword?: string;
   category?: string;
-  sort?: "DISCOUNT_DESC" | "SALES_DESC" | "PRICE_ASC" | "PRICE_DESC" | "COMMISSION_DESC";
+  sort?: "DISCOUNT_DESC" | "SALES_DESC" | "PRICE_ASC" | "PRICE_DESC" | "COMMISSION_DESC" | "RELEVANCE";
   limit?: number;
   page?: number;
   topSellersOnly?: boolean;
@@ -380,17 +380,36 @@ export class ShopeeAffiliateService {
         const requestedLimit = params.limit || 50;
         const page = params.page || 1;
 
+        // Normaliza variações que quebram a indexação da Shopee (ex: "cera ve" -> "cerave")
+        let searchKeyword = (params.keyword || "").trim();
+        if (searchKeyword) {
+          searchKeyword = searchKeyword
+            .replace(/\bcera\s+ve\b/gi, "cerave")
+            .replace(/\bcera-ve\b/gi, "cerave")
+            .replace(/\bair\s+frayer\b/gi, "air fryer")
+            .replace(/\bair\s+frier\b/gi, "air fryer")
+            .replace(/\bcroc's\b/gi, "crocs")
+            .replace(/\banti\s+friz\b/gi, "antifrizz")
+            .replace(/\banti-frizz\b/gi, "antifrizz");
+        }
+
         // sortType na Shopee API:
         // 1: LATEST / RELEVANCE, 2: PRICE_ASC, 3: PRICE_DESC, 4: DISCOUNT_DESC, 5: COMMISSION_DESC, 6: SALES_DESC
         let sortType = 4;
-        if (params.sort === "SALES_DESC") sortType = 6;
+        if (params.sort === "RELEVANCE") sortType = 1;
+        else if (params.sort === "SALES_DESC") sortType = 6;
         else if (params.sort === "PRICE_ASC") sortType = 2;
         else if (params.sort === "PRICE_DESC") sortType = 3;
         else if (params.sort === "COMMISSION_DESC") sortType = 5;
         else if (params.sort === "DISCOUNT_DESC") sortType = 4;
 
         // Função auxiliar para fazer uma requisição à Shopee com limite máximo de 50
-        const fetchShopeePage = async (pageNumber: number, pageLimit: number) => {
+        const fetchShopeePage = async (
+          pageNumber: number,
+          pageLimit: number,
+          overrideKeyword?: string,
+          overrideTopSellers?: boolean
+        ) => {
           const query = `
             query ProductOffer($keyword: String, $page: Int, $limit: Int, $sortType: Int, $isKeySeller: Boolean, $isAMSOffer: Boolean) {
               productOfferV2(
@@ -421,17 +440,20 @@ export class ShopeeAffiliateService {
             }
           `;
 
+          const kw = overrideKeyword !== undefined ? overrideKeyword : searchKeyword;
+          const topSellers = overrideTopSellers !== undefined ? overrideTopSellers : params.topSellersOnly;
+
           const variables: any = {
             page: pageNumber,
             limit: Math.min(pageLimit, 50),
             sortType,
           };
 
-          if (params.keyword && params.keyword.trim() !== "") {
-            variables.keyword = params.keyword.trim();
+          if (kw && kw.trim() !== "") {
+            variables.keyword = kw.trim();
           }
 
-          if (params.topSellersOnly) {
+          if (topSellers) {
             variables.isKeySeller = true;
           }
 
@@ -459,7 +481,7 @@ export class ShopeeAffiliateService {
           return json.data?.productOfferV2?.nodes || [];
         };
 
-        // Buscar até 100 produtos respeitando o teto de 50 por página da Shopee
+        // Buscar produtos respeitando o teto de 50 por página da Shopee
         let rawNodes: any[] = [];
         if (requestedLimit > 50) {
           const [page1Nodes, page2Nodes] = await Promise.all([
@@ -469,6 +491,21 @@ export class ShopeeAffiliateService {
           rawNodes = [...page1Nodes, ...page2Nodes];
         } else {
           rawNodes = await fetchShopeePage(page, requestedLimit);
+        }
+
+        // Se topSellersOnly estava ativado e retornou vazio (limitação de Key Sellers no AMS), tenta sem o filtro
+        if ((!rawNodes || rawNodes.length === 0) && params.topSellersOnly) {
+          rawNodes = await fetchShopeePage(page, requestedLimit, searchKeyword, false);
+        }
+
+        // Se a busca com palavra-chave não retornou nada, tenta variações sem espaços ou termo original
+        if ((!rawNodes || rawNodes.length === 0) && searchKeyword) {
+          if (searchKeyword.includes(" ")) {
+            const joinedKw = searchKeyword.replace(/\s+/g, "");
+            rawNodes = await fetchShopeePage(page, requestedLimit, joinedKw, false);
+          } else if (params.keyword && params.keyword !== searchKeyword) {
+            rawNodes = await fetchShopeePage(page, requestedLimit, params.keyword, false);
+          }
         }
 
         if (rawNodes && rawNodes.length > 0) {

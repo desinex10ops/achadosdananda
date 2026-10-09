@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const keyword = searchParams.get("keyword") || undefined;
     const category = searchParams.get("category") || undefined;
-    const sort = (searchParams.get("sort") as any) || "DISCOUNT_DESC";
+    const sort = (searchParams.get("sort") as any) || (keyword ? "RELEVANCE" : "DISCOUNT_DESC");
     const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!, 10) : 100;
     const page = searchParams.get("page") ? parseInt(searchParams.get("page")!, 10) : 1;
     const topSellersOnly = searchParams.get("topSellers") === "true";

@@ -152,12 +152,13 @@ export default function BuscarProdutosPage() {
   };
 
   // Buscar Produtos Shopee
-  const handleSearch = async () => {
+  const handleSearch = async (overrideKw?: string) => {
     setLoading(true);
     setSelectedIds(new Set());
+    const kwToUse = overrideKw !== undefined ? overrideKw : keyword;
     try {
       const params = new URLSearchParams();
-      if (keyword.trim()) params.append("keyword", keyword.trim());
+      if (kwToUse.trim()) params.append("keyword", kwToUse.trim());
       if (category && category !== "Todas as categorias") params.append("category", category);
       params.append("sort", sort);
       params.append("limit", String(limit));
@@ -171,6 +172,9 @@ export default function BuscarProdutosPage() {
         setProducts(json.data || []);
         setTotalFound(json.total || json.data?.length || 0);
         setSourceType(json.source || "PREVIEW_CATALOG");
+        if (kwToUse.trim()) {
+          showToast(`✅ ${json.data?.length || 0} produtos encontrados para "${kwToUse.trim()}"`);
+        }
       } else {
         showToast("Erro ao buscar produtos: " + (json.error || "Tente novamente"));
       }
@@ -844,17 +848,30 @@ export default function BuscarProdutosPage() {
             </div>
 
             {/* Linha 1: Input de Busca + Categoria + Botão Buscar */}
-            <div className="flex flex-col md:flex-row items-stretch gap-3 mb-4">
+            <div className="flex flex-col md:flex-row items-stretch gap-3 mb-3">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Buscar por palavra-chave... (ex: air fryer, vestido, ryzen, fone bluetooth, cera)"
+                  placeholder="Buscar produto ou marca... (ex: CeraVe, air fryer, vestido, fone bluetooth, maquiagem)"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  className="w-full bg-zinc-900/90 border border-zinc-700/70 focus:border-orange-500 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none transition-all"
+                  className="w-full bg-zinc-900/90 border border-zinc-700/70 focus:border-orange-500 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none transition-all"
                 />
+                {keyword && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKeyword("");
+                      handleSearch("");
+                    }}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white p-1 rounded-full hover:bg-zinc-800 transition-all"
+                    title="Limpar pesquisa"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
               <div className="w-full md:w-56">
@@ -872,13 +889,46 @@ export default function BuscarProdutosPage() {
               </div>
 
               <button
-                onClick={handleSearch}
+                onClick={() => handleSearch()}
                 disabled={loading}
                 className="bg-[#ee4d2d] hover:bg-[#d03b1d] text-white font-bold text-xs px-7 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-950/40 disabled:opacity-50"
               >
                 {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                 Buscar
               </button>
+            </div>
+
+            {/* Sugestões Rápidas de Busca */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-4 text-xs">
+              <span className="text-[11px] font-bold text-zinc-400 mr-1 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-orange-400" />
+                Populares:
+              </span>
+              {[
+                { label: "CeraVe", query: "cerave" },
+                { label: "Air Fryer", query: "air fryer" },
+                { label: "Vestidos", query: "vestido" },
+                { label: "Kit Make", query: "kit maquiagem" },
+                { label: "Fone Bluetooth", query: "fone bluetooth" },
+                { label: "Smartwatch", query: "smartwatch" },
+                { label: "Robô Aspirador", query: "robo aspirador" },
+              ].map((s) => (
+                <button
+                  key={s.label}
+                  type="button"
+                  onClick={() => {
+                    setKeyword(s.query);
+                    handleSearch(s.query);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                    keyword.toLowerCase() === s.query.toLowerCase()
+                      ? "bg-orange-500/20 border-orange-500/50 text-orange-300 font-bold"
+                      : "bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
             </div>
 
             {/* Linha 2: Filtros Secundários & Checkboxes */}
@@ -892,6 +942,7 @@ export default function BuscarProdutosPage() {
                     onChange={(e) => setSort(e.target.value)}
                     className="bg-zinc-900 border border-zinc-700/60 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none"
                   >
+                    <option value="RELEVANCE">Mais Relevantes</option>
                     <option value="DISCOUNT_DESC">Maiores Descontos</option>
                     <option value="SALES_DESC">Mais Vendidos</option>
                     <option value="PRICE_ASC">Menor Preço</option>
@@ -959,7 +1010,7 @@ export default function BuscarProdutosPage() {
 
           {/* Linha de Ação em Massa: Selecionar Todos + Salvar Selecionados */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 bg-zinc-900/60 border border-zinc-800/80 px-4 py-3 rounded-xl">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={toggleSelectAll}
                 className="flex items-center gap-2 text-xs font-semibold text-zinc-200 hover:text-white transition-colors"
@@ -973,6 +1024,19 @@ export default function BuscarProdutosPage() {
                   Selecionar Todos ({selectedIds.size}/{products.length})
                 </span>
               </button>
+
+              {keyword.trim() && (
+                <span className="text-xs bg-orange-950/40 border border-orange-500/30 text-orange-300 px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-medium">
+                  <span>Filtrando por: <b>"{keyword.trim()}"</b></span>
+                  <button
+                    onClick={() => { setKeyword(""); handleSearch(""); }}
+                    className="hover:text-white ml-1 font-bold text-zinc-400"
+                    title="Remover filtro e voltar aos destaques"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
