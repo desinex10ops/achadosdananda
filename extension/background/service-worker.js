@@ -10,7 +10,7 @@ chrome.runtime.onInstalled.addListener(() => {
 // Listener de mensagens de content scripts para contornar restrições cross-origin do Manifest V3
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'CACHE_PRODUCTS') {
-    const backendUrl = request.backendUrl || 'http://localhost:3000';
+    const backendUrl = request.backendUrl || 'https://achadosdananda.vercel.app';
     const items = request.items || [];
 
     if (items.length === 0) {
@@ -36,7 +36,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'SAVE_EXTENSION') {
-    const backendUrl = request.backendUrl || 'http://localhost:3000';
+    const backendUrl = request.backendUrl || 'https://achadosdananda.vercel.app';
     fetch(`${backendUrl}/api/extension/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -60,7 +60,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'FETCH_PENDING_QUEUE') {
-    const backendUrl = request.backendUrl || 'http://localhost:3000';
+    const backendUrl = request.backendUrl || 'https://achadosdananda.vercel.app';
     fetch(`${backendUrl}/api/queue?status=PENDING`)
       .then((res) => res.json())
       .then((data) => sendResponse(data))
@@ -72,7 +72,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'MARK_PUBLISHED') {
-    const backendUrl = request.backendUrl || 'http://localhost:3000';
+    const backendUrl = request.backendUrl || 'https://achadosdananda.vercel.app';
     const id = request.id;
     fetch(`${backendUrl}/api/queue/${id}`, {
       method: 'PUT',

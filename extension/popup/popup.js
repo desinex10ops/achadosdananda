@@ -1,4 +1,4 @@
-let API_BASE = 'http://localhost:3000';
+let API_BASE = 'https://achadosdananda.vercel.app';
 
 let currentSingleProduct = null;
 let currentBatchProducts = [];
