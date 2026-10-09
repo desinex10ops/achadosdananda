@@ -1,0 +1,17 @@
+name: 24-7 Cloud Autopilot Dispatches
+
+on:
+  schedule:
+    # Executa a cada 5 minutos 24 horas por dia / 7 dias por semana
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  dispatch-queue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel Queue Processor
+        run: |
+          curl -s -X POST "https://achadosdananda.vercel.app/api/cron/process-queue" \
+            -H "Content-Type: application/json" \
+            -d '{"source": "github_actions"}'

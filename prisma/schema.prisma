@@ -31,6 +31,9 @@ model Settings {
   autoQueueEnabled       Boolean  @default(false)
   defaultTemplateId      String?
   metaPixelId            String?
+  autopilotActive        Boolean  @default(false)
+  autopilotInterval      Int      @default(8)
+  autopilotLastRun       DateTime?
   updatedAt              DateTime @updatedAt
 }
 

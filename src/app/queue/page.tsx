@@ -156,8 +156,49 @@ export default function QueuePage() {
     }
   };
 
+  const [isAutopilotLoading, setIsAutopilotLoading] = useState(false);
+
+  const fetchAutopilotStatus = async () => {
+    try {
+      // 1. Lê do localStorage primeiro para resposta instantânea na tela sem piscar
+      if (typeof window !== "undefined") {
+        const cachedActive = localStorage.getItem("autopilot_active") === "true";
+        const cachedInterval = Number(localStorage.getItem("autopilot_interval"));
+        if (cachedActive) {
+          setIsAutoPostActive(true);
+          if (cachedInterval) setAutoPostInterval(cachedInterval);
+        }
+      }
+
+      // 2. Sincroniza com o banco de dados no servidor
+      const res = await fetch("/api/queue/autopilot");
+      const json = await res.json();
+      if (json.success && json.data) {
+        const { isActive, intervalMinutes, nextScheduledTime } = json.data;
+        setIsAutoPostActive(isActive);
+        if (intervalMinutes) setAutoPostInterval(intervalMinutes);
+
+        if (typeof window !== "undefined") {
+          localStorage.setItem("autopilot_active", isActive ? "true" : "false");
+          localStorage.setItem("autopilot_interval", String(intervalMinutes || 8));
+        }
+
+        if (isActive && nextScheduledTime) {
+          const diffSeconds = Math.max(
+            0,
+            Math.floor((new Date(nextScheduledTime).getTime() - Date.now()) / 1000)
+          );
+          setCountdown(diffSeconds > 0 ? diffSeconds : (intervalMinutes || 8) * 60);
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao verificar status do piloto automático:", err);
+    }
+  };
+
   useEffect(() => {
     fetchQueue();
+    fetchAutopilotStatus();
   }, []);
 
   // 1. DISPARO 100% DIRETO PARA O GRUPO NO WHATSAPP (SEM ABRIR JANELAS)
@@ -218,20 +259,24 @@ export default function QueuePage() {
     }
   };
 
-  // 3. EXECUÇÃO DO PILOTO AUTOMÁTICO (USA DISPARO DIRETO NA NUVEM)
+  // 3. EXECUÇÃO DO PILOTO AUTOMÁTICO NA NUVEM COM CONTAGEM REGRESSIVA EM TEMPO REAL
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isAutoPostActive) {
       timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
-            const nextPending = items.find((i) => i.status === "PENDING" || i.status === "SCHEDULED");
-            if (nextPending) {
-              handleDirectServerDispatch(nextPending);
-            } else {
-              setIsAutoPostActive(false);
-              showToast("🎉 Todas as ofertas da fila foram disparadas!");
-            }
+            // Aciona o disparador da nuvem para enviar a oferta do horário
+            fetch("/api/cron/process-queue")
+              .then((res) => res.json())
+              .then((data) => {
+                if (data.processed > 0) {
+                  showToast("🚀 Oferta da fila disparada com sucesso no grupo do WhatsApp!");
+                }
+                fetchQueue();
+              })
+              .catch((e) => console.error(e));
+
             return autoPostInterval * 60;
           }
           return prev - 1;
@@ -239,26 +284,70 @@ export default function QueuePage() {
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [isAutoPostActive, items, autoPostInterval]);
+  }, [isAutoPostActive, autoPostInterval]);
 
-  const toggleAutoPost = () => {
+  const toggleAutoPost = async () => {
+    if (isAutopilotLoading) return;
+    setIsAutopilotLoading(true);
+
     if (!isAutoPostActive) {
       const pending = items.filter((i) => i.status === "PENDING" || i.status === "SCHEDULED");
       if (pending.length === 0) {
         showToast("⚠️ Nenhuma oferta pendente na fila para disparar.");
+        setIsAutopilotLoading(false);
         return;
       }
-      
-      // Dispara a 1ª oferta imediatamente direto para o grupo
-      const nextPending = pending[0];
-      handleDirectServerDispatch(nextPending);
 
-      setCountdown(autoPostInterval * 60);
+      showToast("⏳ Ativando Piloto Automático 24/7 no servidor...");
       setIsAutoPostActive(true);
-      showToast(`🤖 Piloto Automático ativado! 1ª oferta disparada direto no grupo. Próximas a cada ${autoPostInterval} min.`);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("autopilot_active", "true");
+        localStorage.setItem("autopilot_interval", String(autoPostInterval));
+      }
+
+      try {
+        const res = await fetch("/api/queue/autopilot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "START",
+            intervalMinutes: autoPostInterval,
+            sendFirstImmediately: true,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`🚀 Piloto Automático 24/7 ativado! Grade salva na nuvem. Os disparos continuarão mesmo com o computador desligado.`);
+          setCountdown(autoPostInterval * 60);
+          fetchQueue();
+        } else {
+          showToast(`❌ Erro: ${data.error || "Falha ao ativar piloto"}`);
+          setIsAutoPostActive(false);
+          if (typeof window !== "undefined") localStorage.removeItem("autopilot_active");
+        }
+      } catch (err) {
+        console.error(err);
+        showToast("❌ Erro de conexão ao ativar piloto automático.");
+      } finally {
+        setIsAutopilotLoading(false);
+      }
     } else {
       setIsAutoPostActive(false);
-      showToast("⏸️ Piloto Automático pausado.");
+      if (typeof window !== "undefined") localStorage.removeItem("autopilot_active");
+
+      try {
+        await fetch("/api/queue/autopilot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "PAUSE" }),
+        });
+        showToast("⏸️ Piloto Automático pausado no servidor.");
+        fetchQueue();
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsAutopilotLoading(false);
+      }
     }
   };
 
@@ -526,7 +615,7 @@ export default function QueuePage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white">🤖 Piloto Automático (Disparo Direto na Nuvem)</h2>
+                <h2 className="text-base font-bold text-white">🤖 Piloto Automático 24/7 (Disparo Direto na Nuvem)</h2>
                 <span
                   className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                     isAutoPostActive
@@ -534,11 +623,11 @@ export default function QueuePage() {
                       : "bg-slate-800 text-slate-400"
                   }`}
                 >
-                  {isAutoPostActive ? "ATIVO & ENVIANDO DIRETO" : "PAUSADO"}
+                  {isAutoPostActive ? "ATIVO NA NUVEM 24/7 (NÃO PAUSA)" : "PAUSADO"}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Envia as ofertas <strong>direto para o grupo PROMO MODA & BELEZA #4</strong> via servidor sem abrir janelas no seu computador.
+                Dispara as ofertas via servidor na nuvem. <strong>Continua funcionando mesmo com o computador desligado</strong> e <strong>não pausa ao atualizar a página</strong>.
               </p>
             </div>
           </div>
