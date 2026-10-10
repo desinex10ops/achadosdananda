@@ -263,6 +263,8 @@ export default function QueuePage() {
   // 3. EXECUÇÃO DO PILOTO AUTOMÁTICO NA NUVEM COM CONTAGEM REGRESSIVA EM TEMPO REAL
   useEffect(() => {
     let timer: NodeJS.Timeout;
+    let pollInterval: NodeJS.Timeout;
+
     if (isAutoPostActive) {
       timer = setInterval(() => {
         setCountdown((prev) => {
@@ -272,7 +274,7 @@ export default function QueuePage() {
               .then((res) => res.json())
               .then((data) => {
                 if (data.processed > 0) {
-                  showToast("🚀 Oferta da fila disparada com sucesso no grupo do WhatsApp!");
+                  showToast(`🚀 ${data.processed} oferta(s) disparada(s) com sucesso no grupo do WhatsApp!`);
                 }
                 fetchQueue();
               })
@@ -283,8 +285,16 @@ export default function QueuePage() {
           return prev - 1;
         });
       }, 1000);
+
+      // Sincroniza a grade da fila a cada 15 segundos para atualizar status em tempo real
+      pollInterval = setInterval(() => {
+        fetchQueue();
+      }, 15000);
     }
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, [isAutoPostActive, autoPostInterval]);
 
   const toggleAutoPost = async () => {
