@@ -75,8 +75,8 @@ export async function POST(request: Request) {
           marketplace = (await prisma.marketplace.findFirst())!;
         }
 
-        // Extrai título simples da primeira linha
-        const firstLine = originalText.split(/\r?\n/).find((l: string) => l.trim().length > 3) || "Oferta Espelhada";
+        // Extrai título limpo da primeira linha sanitizada
+        const firstLine = clonedText.split(/\r?\n/).find((l: string) => l.trim().length > 3) || "Achado Imperdível";
         const cleanTitle = firstLine.replace(/[*_~`]/g, "").trim().slice(0, 100);
 
         // Cria o Produto

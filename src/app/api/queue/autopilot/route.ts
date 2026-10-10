@@ -145,13 +145,26 @@ export async function POST(request: Request) {
             targetGroups = activeGroups as any;
           }
 
+          const rawSiteUrl = process.env.NEXTAUTH_URL || "https://achadosdananda.vercel.app";
+          const siteUrl = rawSiteUrl.includes("localhost") ? "https://achadosdananda.vercel.app" : rawSiteUrl;
+
+          let cleanText = firstItem.generatedText
+            .replace(/Oferta exclusiva encontrada no grupo[^\n]*\n*/gi, "")
+            .replace(/encontrad[ao] no grupo[^\n]*\n*/gi, "")
+            .replace(/Promo de Rica[^\n]*\n*/gi, "")
+            .trim();
+
+          const directAffiliate = firstItem.offer.affiliateUrl || firstItem.offer.originalUrl;
+          cleanText = cleanText.replace(/http:\/\/localhost:3000\/r\/[^\s]+/gi, directAffiliate || `${siteUrl}/r/${firstItem.offerId}`);
+          cleanText = cleanText.replace(/http:\/\/localhost:3000/gi, siteUrl);
+
           let anySuccess = false;
           for (const group of targetGroups) {
             const channelJid = group.whatsappJid!;
             const instance = group.instanceName || process.env.EVOLUTION_DEFAULT_INSTANCE || "nanda-principal";
 
             const res = await adapter.distribute({
-              messageText: firstItem.generatedText,
+              messageText: cleanText,
               imageUrl: firstItem.offer.product.imageUrl,
               targetChannelId: channelJid,
               instanceName: instance,

@@ -77,7 +77,8 @@ async function handleProcessQueue() {
 
     const adapter = getDistributionAdapter("EVOLUTION");
     const results: any[] = [];
-    const siteUrl = process.env.NEXTAUTH_URL || "https://achadosdananda.vercel.app";
+    const rawSiteUrl = process.env.NEXTAUTH_URL || "https://achadosdananda.vercel.app";
+    const siteUrl = rawSiteUrl.includes("localhost") ? "https://achadosdananda.vercel.app" : rawSiteUrl;
 
     for (const pub of duePublications) {
       // 3. Busca grupos vinculados ativos
@@ -96,20 +97,21 @@ async function handleProcessQueue() {
       let pubSuccess = false;
       let lastErrorMessage = "";
 
-      // 4. Converte links para o rastreador próprio /r/{offerId} e aplica Spintax
-      const trackedLink = `${siteUrl}/r/${pub.offerId}`;
       let messageToSend = pub.generatedText;
 
-      if (!messageToSend.includes("/r/")) {
-        const originalAffiliate = pub.offer.affiliateUrl || pub.offer.originalUrl;
-        if (originalAffiliate && messageToSend.includes(originalAffiliate)) {
-          messageToSend = messageToSend.replace(originalAffiliate, trackedLink);
-        } else {
-          messageToSend = messageToSend.replace(/https?:\/\/[^\s]+/g, (url) => {
-            return url.includes("/r/") ? url : trackedLink;
-          });
-        }
-      }
+      // BLINDAGEM 1: Remove qualquer menção acidental a grupos concorrentes (ex: Promo de Rica)
+      messageToSend = messageToSend
+        .replace(/Oferta exclusiva encontrada no grupo[^\n]*\n*/gi, "")
+        .replace(/encontrad[ao] no grupo[^\n]*\n*/gi, "")
+        .replace(/Promo de Rica[^\n]*\n*/gi, "")
+        .trim();
+
+      // BLINDAGEM 2: Substitui qualquer localhost acidental pelo link de afiliada oficial da Nanda
+      const directAffiliate = pub.offer.affiliateUrl || pub.offer.originalUrl;
+      messageToSend = messageToSend.replace(/http:\/\/localhost:3000\/r\/[^\s]+/gi, directAffiliate || `${siteUrl}/r/${pub.offerId}`);
+
+      // Se a mensagem ainda contiver localhost:
+      messageToSend = messageToSend.replace(/http:\/\/localhost:3000/gi, siteUrl);
 
       // Humanização anti-ban: processa spintax no texto da mensagem
       messageToSend = parseSpintax(messageToSend);

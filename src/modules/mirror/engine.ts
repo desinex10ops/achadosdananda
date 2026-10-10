@@ -56,7 +56,7 @@ export class MirrorEngine {
   }
 
   /**
-   * Modo CLONE: Mantém exatamente a mensagem original do concorrente, trocando apenas os links de afiliado
+   * Modo CLONE: Mantém a mensagem original, trocando os links de afiliado e expurgando menções a concorrentes
    */
   static cloneMessage(text: string): {
     clonedText: string;
@@ -68,13 +68,24 @@ export class MirrorEngine {
     const urlRegex = /(https?:\/\/[^\s]+)/gi;
     const replacedLinks: MirroredLinkResult[] = [];
 
-    const clonedText = text.replace(urlRegex, (match) => {
+    let clonedText = text.replace(urlRegex, (match) => {
       // Remove pontuação acidental no final do link
       let rawUrl = match;
       let trailingPunct = "";
       if (/[.,!?;)]$/.test(rawUrl)) {
         trailingPunct = rawUrl.slice(-1);
         rawUrl = rawUrl.slice(0, -1);
+      }
+
+      // Expurgar links de grupos/canais de concorrentes (WhatsApp / Telegram)
+      const low = rawUrl.toLowerCase();
+      if (
+        low.includes("chat.whatsapp.com") ||
+        low.includes("whatsapp.com/channel") ||
+        low.includes("t.me/") ||
+        low.includes("telegram.me/")
+      ) {
+        return "";
       }
 
       const res = this.convertUrl(rawUrl);
@@ -84,6 +95,17 @@ export class MirrorEngine {
       }
       return match;
     });
+
+    // Sanitiza qualquer menção a grupos concorrentes ou convites externos
+    clonedText = clonedText
+      .replace(/Oferta exclusiva encontrada no grupo[^\n]*\n*/gi, "")
+      .replace(/encontrad[ao] no grupo[^\n]*\n*/gi, "")
+      .replace(/Promo de Rica[^\n]*\n*/gi, "")
+      .replace(/Participe do nosso grupo[^\n]*\n*/gi, "")
+      .replace(/Entre no nosso grupo[^\n]*\n*/gi, "")
+      .replace(/Entre no grupo[^\n]*\n*/gi, "")
+      .replace(/Link do grupo[^\n]*\n*/gi, "")
+      .trim();
 
     return { clonedText, replacedLinks };
   }

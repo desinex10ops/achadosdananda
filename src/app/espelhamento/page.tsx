@@ -479,7 +479,7 @@ export default function EspelhamentoPage() {
                     onClick={() => {
                       setIsTestModalOpen(true);
                       setTestInputText(
-                        `Oferta exclusiva encontrada no grupo ${rule.sourceGroupName}!\n\nConfira este produto imperdível:\nhttps://www.mercadolivre.com.br/produto-teste/p/MLB999\n\nAproveite!`
+                        `✨ ACHADO IMPERDÍVEL!\n\nConfira este produto em super promoção:\nhttps://www.mercadolivre.com.br/produto-teste/p/MLB999\n\nGaranta o seu com desconto!`
                       );
                       setTestResult(null);
                     }}
