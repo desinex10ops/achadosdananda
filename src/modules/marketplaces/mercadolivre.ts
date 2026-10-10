@@ -190,7 +190,7 @@ export class MercadoLivreScraperService {
     keyword: string,
     limit: number = 30
   ): Promise<MercadoLivreProductItem[]> {
-    const affiliateTag = process.env.MERCADO_LIVRE_AFFILIATE_TAG || "meli-achadosnanda";
+    const affiliateTag = process.env.MERCADO_LIVRE_AFFILIATE_TAG || "clma9212398";
     const q = (keyword || "").toLowerCase().trim();
     const normalizedQ = q.replace(/s\b/g, ""); // normaliza plurais (camisas -> camisa)
 
@@ -349,7 +349,7 @@ export class MercadoLivreScraperService {
   /**
    * Converte uma URL do Mercado Livre para link de afiliado da Nanda
    */
-  static convertToAffiliateUrl(url: string, affiliateTag: string = "meli-achadosnanda"): string {
+  static convertToAffiliateUrl(url: string, affiliateTag: string = "clma9212398"): string {
     if (!url) return url;
     try {
       let clean = url.trim().split("#")[0];
@@ -532,7 +532,7 @@ export class MercadoLivreScraperService {
    */
   static async resolveLinks(urls: string[]): Promise<MercadoLivreProductItem[]> {
     const results: MercadoLivreProductItem[] = [];
-    const affiliateTag = process.env.MERCADO_LIVRE_AFFILIATE_TAG || "meli-achadosnanda";
+    const affiliateTag = process.env.MERCADO_LIVRE_AFFILIATE_TAG || "clma9212398";
 
     // 1. Normaliza e extrai URLs válidas
     const validUrls: string[] = [];

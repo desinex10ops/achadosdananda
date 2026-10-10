@@ -16,7 +16,7 @@ export class MirrorEngine {
 
     // 1. Mercado Livre
     if (low.includes("mercadolivre.com") || low.includes("mercadolibre.com") || low.includes("meli.la")) {
-      const tag = process.env.MERCADO_LIVRE_AFFILIATE_TAG || "meli-achadosnanda";
+      const tag = process.env.MERCADO_LIVRE_AFFILIATE_TAG || "clma9212398";
       if (clean.includes("matt_tool=")) {
         clean = clean.replace(/matt_tool=[^&]+/g, `matt_tool=${tag}`);
       } else {
