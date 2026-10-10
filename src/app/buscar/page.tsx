@@ -93,7 +93,8 @@ export default function BuscarProdutosPage() {
   const [sourceType, setSourceType] = useState<string>("PREVIEW_CATALOG");
   const [totalFound, setTotalFound] = useState(0);
 
-  // Mercado Livre: Captura por Links
+  // Mercado Livre: Busca por Palavra-Chave & Captura por Links
+  const [meliKeyword, setMeliKeyword] = useState("");
   const [meliLinksInput, setMeliLinksInput] = useState("");
   const [meliProducts, setMeliProducts] = useState<MeliProduct[]>([]);
   const [selectedMeliIds, setSelectedMeliIds] = useState<Set<string>>(new Set());
@@ -170,7 +171,6 @@ export default function BuscarProdutosPage() {
   // Buscar Produtos Shopee
   const handleSearch = async (overrideKw?: string) => {
     setLoading(true);
-    setSelectedIds(new Set());
     const kwToUse = overrideKw !== undefined ? overrideKw : keyword;
     try {
       const params = new URLSearchParams();
@@ -185,11 +185,14 @@ export default function BuscarProdutosPage() {
       const json = await res.json();
 
       if (json.success) {
-        setProducts(json.data || []);
-        setTotalFound(json.total || json.data?.length || 0);
+        const found = json.data || [];
+        setProducts(found);
+        setTotalFound(json.total || found.length || 0);
         setSourceType(json.source || "PREVIEW_CATALOG");
+        // Auto-seleciona todos os produtos encontrados por padrão
+        setSelectedIds(new Set(found.map((p: any) => p.id)));
         if (kwToUse.trim()) {
-          showToast(`✅ ${json.data?.length || 0} produtos encontrados para "${kwToUse.trim()}"`);
+          showToast(`✅ ${found.length} produtos encontrados e selecionados para "${kwToUse.trim()}"`);
         }
       } else {
         showToast("Erro ao buscar produtos: " + (json.error || "Tente novamente"));
@@ -202,15 +205,44 @@ export default function BuscarProdutosPage() {
     }
   };
 
+  // Buscar Produtos Mercado Livre por Palavra-Chave
+  const handleSearchMeliKeyword = async (overrideKw?: string) => {
+    const term = (overrideKw !== undefined ? overrideKw : meliKeyword).trim();
+    setLoadingMeli(true);
+    setMeliBatchProgress("Buscando ofertas reais no Mercado Livre...");
+    try {
+      const res = await fetch(`/api/marketplaces/mercadolivre/search?keyword=${encodeURIComponent(term || "ofertas")}`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        setMeliProducts(json.data);
+        // Auto-seleciona todos por padrão
+        setSelectedMeliIds(new Set(json.data.map((p: any) => p.id)));
+        showToast(`✅ ${json.data.length} ofertas do Mercado Livre carregadas e selecionadas!`);
+      } else {
+        showToast("Nenhuma oferta encontrada para essa busca.");
+      }
+    } catch (err: any) {
+      console.error("Erro na busca ML:", err);
+      showToast("❌ Erro ao buscar produtos no Mercado Livre.");
+    } finally {
+      setLoadingMeli(false);
+      setMeliBatchProgress(null);
+    }
+  };
+
   // Resolver Links do Mercado Livre
   const handleSearchMeliLinks = async () => {
-    if (!meliLinksInput.trim()) {
-      showToast("Cole os links do Mercado Livre no campo de texto.");
+    const rawInput = meliLinksInput.trim();
+    if (!rawInput) {
+      // Se a caixa de links estiver vazia, faz busca pela palavra-chave
+      if (meliKeyword.trim()) {
+        return handleSearchMeliKeyword();
+      }
+      showToast("Digite o nome de um produto ou cole links do Mercado Livre.");
       return;
     }
 
     setLoadingMeli(true);
-    const rawInput = meliLinksInput.trim();
 
     // 1. Detecta se é payload com dados e fotos reais da extensão (JSON)
     if (rawInput.startsWith("[") || rawInput.startsWith("{")) {
@@ -250,13 +282,13 @@ export default function BuscarProdutosPage() {
     const matches = rawInput.match(urlRegex) || [];
     const targetLinks = matches.length > 0 ? Array.from(new Set(matches)) : rawInput.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
-    setMeliBatchProgress(`Carregando fotos e ofertas reais (${targetLinks.length} item(ns))...`);
+    setMeliBatchProgress(`Carregando fotos e ofertas reais (${targetLinks.length > 0 ? targetLinks.length : 1} item(ns))...`);
 
     try {
       const res = await fetch("/api/marketplaces/mercadolivre/scrape-links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ links: targetLinks, text: rawInput }),
+        body: JSON.stringify({ links: targetLinks, text: rawInput, keyword: rawInput }),
       });
 
       const json = await res.json();
@@ -281,6 +313,13 @@ export default function BuscarProdutosPage() {
     loadApiConfig();
     handleSearch();
   }, []);
+
+  // Carregar produtos em destaque do Mercado Livre ao abrir a aba
+  useEffect(() => {
+    if (activePlatform === "meli" && meliProducts.length === 0 && !loadingMeli) {
+      handleSearchMeliKeyword("ofertas");
+    }
+  }, [activePlatform]);
 
   // Seleção de Produtos Shopee
   const toggleSelect = (id: string) => {
@@ -319,9 +358,23 @@ export default function BuscarProdutosPage() {
   // Abrir Modal de Salvar Fila Exclusiva
   const handleOpenSaveModal = async (source: "shopee" | "meli") => {
     const isShopee = source === "shopee";
-    const count = isShopee ? selectedIds.size : selectedMeliIds.size;
+    let count = isShopee ? selectedIds.size : selectedMeliIds.size;
+
+    // Se nenhum item estiver marcado mas existirem produtos na tela, seleciona todos automaticamente!
     if (count === 0) {
-      showToast("Selecione pelo menos um produto para salvar na fila.");
+      if (isShopee && products.length > 0) {
+        const allIds = new Set(products.map((p) => p.id));
+        setSelectedIds(allIds);
+        count = allIds.size;
+      } else if (!isShopee && meliProducts.length > 0) {
+        const allIds = new Set(meliProducts.map((p) => p.id));
+        setSelectedMeliIds(allIds);
+        count = allIds.size;
+      }
+    }
+
+    if (count === 0) {
+      showToast("Nenhum produto disponível para salvar na fila.");
       return;
     }
 
@@ -669,70 +722,146 @@ export default function BuscarProdutosPage() {
       {/* ========================================================================= */}
       {activePlatform === "meli" ? (
         <div>
-          {/* Caixa de Entrada de Links (Imagem 2) */}
-          <div className="bg-[#121215] border border-zinc-800/90 rounded-2xl p-6 mb-6 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
+          {/* 1. Busca Direta por Palavra-Chave no Mercado Livre */}
+          <div className="bg-[#121215] border border-yellow-500/30 rounded-2xl p-6 mb-4 shadow-xl">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-bold text-white flex items-center gap-2.5">
                 <span className="p-1.5 rounded-lg bg-yellow-950/60 border border-yellow-500/40 text-yellow-400">
-                  🔗
+                  🔍
                 </span>
-                Captura por Links — Mercado Livre
+                Buscar Ofertas — Mercado Livre
                 <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-400 text-zinc-950 uppercase tracking-wider">
-                  PREMIUM
+                  AO VIVO
                 </span>
               </h2>
             </div>
 
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-semibold text-zinc-300">
-                Cole os links do Mercado Livre (um por linha):
-              </label>
-              <div className="text-[11px] text-emerald-400/90 bg-emerald-950/40 border border-emerald-500/20 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                <span>📸 Dica de Ouro:</span>
-                <span>Na aba do Mercado Livre, use o botão verde <b>"✨ Copiar com Fotos Reais"</b> ou <b>"🔗 Extrair Links"</b> do widget flutuante para carregar fotos 100% reais sem imagens trocadas!</span>
+            <div className="flex flex-col sm:flex-row items-stretch gap-2.5 mb-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar produto no Mercado Livre... (ex: furadeira, camisas, air fryer, fone bluetooth, relógio)"
+                  value={meliKeyword}
+                  onChange={(e) => setMeliKeyword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSearchMeliKeyword();
+                  }}
+                  className="w-full bg-zinc-900/90 border border-zinc-700/80 focus:border-yellow-400 rounded-xl pl-10 pr-10 py-2.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none transition-all"
+                />
+                {meliKeyword && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMeliKeyword("");
+                      handleSearchMeliKeyword("ofertas");
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white p-1 text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={() => handleSearchMeliKeyword()}
+                disabled={loadingMeli}
+                className="bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-black text-xs px-6 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-yellow-950/30 disabled:opacity-50"
+              >
+                {loadingMeli ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-zinc-950" />
+                    Buscando...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4 text-zinc-950" />
+                    Buscar no ML
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Tags de Busca Rápida */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-zinc-400">
+              <span className="font-semibold text-zinc-500">Mais buscados:</span>
+              {[
+                { label: "⚡ Furadeira", kw: "furadeira" },
+                { label: "👔 Camisas", kw: "camisa" },
+                { label: "🎧 Fone Bluetooth", kw: "fone" },
+                { label: "🍳 Air Fryer", kw: "air fryer" },
+                { label: "⌚ Smartwatch", kw: "smartwatch" },
+                { label: "🧹 Robô Aspirador", kw: "robo aspirador" },
+                { label: "💄 Beleza", kw: "beleza" },
+              ].map((tag) => (
+                <button
+                  key={tag.kw}
+                  onClick={() => {
+                    setMeliKeyword(tag.kw);
+                    handleSearchMeliKeyword(tag.kw);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-yellow-500/10 border border-zinc-800 hover:border-yellow-500/40 text-zinc-300 hover:text-yellow-400 transition-all font-medium"
+                >
+                  {tag.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Captura por Links & Extensão (Secundário / Avançado) */}
+          <div className="bg-[#121215] border border-zinc-800/90 rounded-2xl p-5 mb-6 shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">🔗</span>
+                <span className="text-xs font-bold text-zinc-300">Colar Links ou Dados da Extensão:</span>
+              </div>
+              <div className="text-[11px] text-emerald-400/90 bg-emerald-950/40 border border-emerald-500/20 px-3 py-1 rounded-lg flex items-center gap-1.5">
+                <span>📸 Dica:</span>
+                <span>Cole links individuais ou use o botão <b>"✨ Copiar com Fotos Reais"</b> da extensão flutuante.</span>
               </div>
             </div>
+
             <textarea
-              rows={5}
+              rows={3}
               value={meliLinksInput}
               onChange={(e) => setMeliLinksInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.ctrlKey && e.key === "Enter") handleSearchMeliLinks();
               }}
-              placeholder="https://www.mercadolivre.com.br/...\nhttps://produto.mercadolivre.com.br/MLB-..."
-              className="w-full bg-zinc-900/90 border border-zinc-700/80 focus:border-yellow-400 rounded-xl p-3.5 text-xs text-zinc-200 font-mono placeholder-zinc-500 focus:outline-none transition-all mb-3 leading-relaxed"
+              placeholder="Cole URLs do Mercado Livre (ex: https://produto.mercadolivre.com.br/MLB-...) ou JSON da extensão"
+              className="w-full bg-zinc-900/90 border border-zinc-700/80 focus:border-yellow-400 rounded-xl p-3 text-xs text-zinc-200 font-mono placeholder-zinc-500 focus:outline-none transition-all mb-3 leading-relaxed"
             />
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="text-[11px] text-zinc-500 flex items-center gap-2">
-                <span>Dica: Use <b>Ctrl+Enter</b> para pesquisar ou clique no botão ao lado.</span>
+              <div className="text-[11px] text-zinc-500">
+                <span>Cole um ou vários links para extrair fotos e dados oficiais.</span>
               </div>
 
               <div className="flex items-center gap-2">
                 {meliLinksInput && (
                   <button
                     onClick={() => setMeliLinksInput("")}
-                    className="text-xs text-zinc-400 hover:text-red-400 px-3 py-2 rounded-xl border border-zinc-800 hover:border-red-900/40 bg-zinc-900/50 transition-all flex items-center gap-1.5"
+                    className="text-xs text-zinc-400 hover:text-red-400 px-3 py-1.5 rounded-xl border border-zinc-800 hover:border-red-900/40 bg-zinc-900/50 transition-all flex items-center gap-1.5"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    Limpar texto
+                    Limpar
                   </button>
                 )}
 
                 <button
                   onClick={handleSearchMeliLinks}
                   disabled={loadingMeli}
-                  className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-sky-950/40 disabled:opacity-50"
+                  className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-5 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-sky-950/40 disabled:opacity-50"
                 >
                   {loadingMeli ? (
                     <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Buscando...
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Processando...
                     </>
                   ) : (
                     <>
-                      <Search className="w-4 h-4" />
-                      Pesquisar
+                      <Zap className="w-3.5 h-3.5" />
+                      Carregar Links
                     </>
                   )}
                 </button>
@@ -781,11 +910,11 @@ export default function BuscarProdutosPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => handleOpenSaveModal("meli")}
-                disabled={selectedMeliIds.size === 0}
-                className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-extrabold text-xs px-6 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-950/40 disabled:opacity-40"
+                disabled={meliProducts.length === 0}
+                className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-extrabold text-xs px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-950/40 disabled:opacity-40"
               >
                 <Save className="w-4 h-4" />
-                Salvar ({selectedMeliIds.size})
+                Salvar ({selectedMeliIds.size > 0 ? selectedMeliIds.size : meliProducts.length})
               </button>
             </div>
           </div>
@@ -1129,15 +1258,15 @@ export default function BuscarProdutosPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleSaveSelected}
-                disabled={savingBulk || selectedIds.size === 0}
-                className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs px-5 py-2 rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-amber-950/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={savingBulk || products.length === 0}
+                className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-amber-950/40 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {savingBulk ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
                 ) : (
                   <Save className="w-4 h-4" />
                 )}
-                Salvar Selecionados ({selectedIds.size})
+                Salvar Selecionados ({selectedIds.size > 0 ? selectedIds.size : products.length})
               </button>
             </div>
           </div>

@@ -39,22 +39,31 @@ export async function POST(request: Request) {
       }
     }
 
-    if (extractedUrls.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Nenhum link válido do Mercado Livre foi encontrado no texto." },
-        { status: 400 }
-      );
+    // Se URLs forem encontradas, tenta resolver os links
+    if (extractedUrls.length > 0) {
+      const products = await MercadoLivreScraperService.resolveLinks(extractedUrls);
+      if (products && products.length > 0) {
+        return NextResponse.json({
+          success: true,
+          data: products,
+          total: products.length,
+          type: "LINKS_RESOLVED",
+        });
+      }
     }
 
-    const products = await MercadoLivreScraperService.resolveLinks(extractedUrls);
+    // Se não há URLs ou se os links não retornaram nada, trata como termo de busca por palavra-chave
+    const rawSearch = (body.keyword || body.query || rawInputs.join(" ")).trim();
+    const products = await MercadoLivreScraperService.searchProducts(rawSearch || "ofertas", 50);
 
     return NextResponse.json({
       success: true,
       data: products,
       total: products.length,
+      type: "SEARCH_RESULTS",
     });
   } catch (err: any) {
-    console.error("Erro ao resolver links do Mercado Livre:", err);
+    console.error("Erro ao resolver links ou buscar produtos do Mercado Livre:", err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

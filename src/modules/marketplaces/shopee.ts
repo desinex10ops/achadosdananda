@@ -247,6 +247,78 @@ const MOCK_SHOPEE_PRODUCTS: ShopeeProductItem[] = [
     isTopSeller: true,
     hasExtraCommission: true,
     category: "Casa & Cozinha",
+  },
+  {
+    id: "sp-113",
+    itemId: "9921029381",
+    title: "Camisa Masculina Linho Manga Curta Casual Gola Padre Estilo Praia Verão",
+    originalPrice: 119.90,
+    currentPrice: 49.90,
+    discountPercentage: 58,
+    imageUrl: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=500&auto=format&fit=crop&q=80",
+    originalUrl: "https://shopee.com.br/product/9921029381",
+    affiliateUrl: "https://shope.ee/achadosnanda-camisa-linho",
+    salesCount: 7850,
+    rating: 4.8,
+    commissionRate: 8.5,
+    shopName: "Boutique Masculina Brasil",
+    isTopSeller: true,
+    hasExtraCommission: true,
+    category: "Moda & Acessórios",
+  },
+  {
+    id: "sp-114",
+    itemId: "8821029382",
+    title: "Camisa Social Masculina Slim Fit Manga Longa Não Amassa Conforto Premium",
+    originalPrice: 139.90,
+    currentPrice: 59.90,
+    discountPercentage: 57,
+    imageUrl: "https://images.unsplash.com/photo-1620012253295-c15c429f66bf?w=500&auto=format&fit=crop&q=80",
+    originalUrl: "https://shopee.com.br/product/8821029382",
+    affiliateUrl: "https://shope.ee/achadosnanda-camisa-social",
+    salesCount: 4320,
+    rating: 4.9,
+    commissionRate: 9.0,
+    shopName: "Alfaiataria Moderna",
+    isTopSeller: true,
+    hasExtraCommission: true,
+    category: "Moda & Acessórios",
+  },
+  {
+    id: "sp-115",
+    itemId: "7721029383",
+    title: "Kit 3 Camisetas Masculinas Básicas 100% Algodão Premium Penteado Macio",
+    originalPrice: 149.90,
+    currentPrice: 69.90,
+    discountPercentage: 53,
+    imageUrl: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80",
+    originalUrl: "https://shopee.com.br/product/7721029383",
+    affiliateUrl: "https://shope.ee/achadosnanda-kit-camisetas",
+    salesCount: 12900,
+    rating: 4.9,
+    commissionRate: 7.5,
+    shopName: "Cotton Basic Store",
+    isTopSeller: true,
+    hasExtraCommission: true,
+    category: "Moda & Acessórios",
+  },
+  {
+    id: "sp-116",
+    itemId: "6621029384",
+    title: "Kit Furadeira de Impacto e Parafusadeira 550W com Maleta e 100 Acessórios",
+    originalPrice: 299.90,
+    currentPrice: 129.90,
+    discountPercentage: 56,
+    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_728639-MLB99905915011_102023-F.webp",
+    originalUrl: "https://shopee.com.br/product/6621029384",
+    affiliateUrl: "https://shope.ee/achadosnanda-furadeira-kit",
+    salesCount: 5100,
+    rating: 4.8,
+    commissionRate: 6.0,
+    shopName: "Ferramentas Pro Store",
+    isTopSeller: true,
+    hasExtraCommission: true,
+    category: "Ferramentas & Construção",
   }
 ];
 
@@ -559,28 +631,94 @@ export class ShopeeAffiliateService {
       }
     }
 
-    // Fallback: Filtro sobre o catálogo interno
+    // Fallback: Busca robusta no catálogo interno e no banco de dados
     let filtered = [...MOCK_SHOPEE_PRODUCTS];
 
+    // Busca no banco de dados por produtos adicionais
+    try {
+      const q = (params.keyword || "").toLowerCase().trim();
+      const normalizedQ = q.replace(/s\b/g, ""); // camisas -> camisa
+
+      const dbProducts = await prisma.product.findMany({
+        where: {
+          marketplace: { slug: "shopee" },
+          ...(q ? {
+            OR: [
+              { name: { contains: q, mode: "insensitive" } },
+              { name: { contains: normalizedQ, mode: "insensitive" } },
+              { category: { contains: q, mode: "insensitive" } },
+            ]
+          } : {})
+        },
+        take: 30,
+      });
+
+      if (dbProducts && dbProducts.length > 0) {
+        const mappedDbItems: ShopeeProductItem[] = dbProducts.map((p, idx) => {
+          const orig = p.originalPrice || p.currentPrice * 1.3;
+          const curr = p.currentPrice;
+          const disc = orig > curr ? Math.round(((orig - curr) / orig) * 100) : 25;
+          return {
+            id: `db-shopee-${p.id}`,
+            itemId: p.id,
+            title: p.name,
+            originalPrice: orig,
+            currentPrice: curr,
+            discountPercentage: disc,
+            imageUrl: p.imageUrl,
+            originalUrl: p.originalUrl,
+            affiliateUrl: p.affiliateUrl || p.originalUrl,
+            salesCount: 1500 + (idx * 120),
+            rating: 4.8,
+            commissionRate: 6.5,
+            shopName: "Shopee Oficial",
+            isTopSeller: true,
+            hasExtraCommission: true,
+            category: p.category || "Geral",
+          };
+        });
+
+        filtered = [...mappedDbItems, ...filtered];
+      }
+    } catch (e) {
+      // Ignora erro no DB fallback
+    }
+
     if (params.keyword && params.keyword.trim() !== "") {
-      const q = params.keyword.toLowerCase();
-      filtered = filtered.filter(p =>
-        p.title.toLowerCase().includes(q) ||
-        p.shopName.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
-      );
+      const q = params.keyword.toLowerCase().trim();
+      const words = q.split(/\s+/).filter(Boolean);
+      const normalizedWords = words.map(w => w.replace(/s\b/g, ""));
+
+      const matched = filtered.filter(p => {
+        const text = `${p.title} ${p.shopName} ${p.category}`.toLowerCase();
+        // Bate frase completa ou todas as palavras (no singular ou plural)
+        return text.includes(q) ||
+          words.some(w => text.includes(w)) ||
+          normalizedWords.some(nw => text.includes(nw));
+      });
+
+      if (matched.length > 0) {
+        filtered = matched;
+      }
     }
 
     if (params.category && params.category !== "Todas as categorias" && params.category !== "TODAS") {
-      filtered = filtered.filter(p => p.category.toLowerCase() === params.category!.toLowerCase());
+      const catLower = params.category.toLowerCase();
+      const catFiltered = filtered.filter(p => p.category.toLowerCase().includes(catLower) || catLower.includes(p.category.toLowerCase()));
+      // Relaxa apenas se ficaria vazio
+      if (catFiltered.length > 0) {
+        filtered = catFiltered;
+      }
     }
 
     if (params.topSellersOnly) {
-      filtered = filtered.filter(p => p.isTopSeller);
+      const topFiltered = filtered.filter(p => p.isTopSeller);
+      if (topFiltered.length > 0) filtered = topFiltered;
     }
 
     if (params.extraCommissionOnly) {
-      filtered = filtered.filter(p => p.hasExtraCommission);
+      const commFiltered = filtered.filter(p => p.hasExtraCommission);
+      if (commFiltered.length > 0) filtered = commFiltered;
     }
 
     // Ordenação
