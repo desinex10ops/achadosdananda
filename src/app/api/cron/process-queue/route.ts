@@ -28,7 +28,7 @@ async function handleProcessQueue() {
     const settings = await prisma.settings.findFirst();
     const isAutopilotActive = settings?.autopilotActive ?? false;
 
-    // 2. Busca ofertas agendadas cujo horário já chegou ou passou
+    // 2. Busca apenas 1 oferta com horário vencido por ciclo (evita disparos em massa e colisões)
     let duePublications = await prisma.publication.findMany({
       where: {
         status: "SCHEDULED",
@@ -43,11 +43,11 @@ async function handleProcessQueue() {
         },
       },
       orderBy: { scheduledFor: "asc" },
-      take: 2, // Processa até 2 ofertas por ciclo para cadência natural
+      take: 1,
     });
 
     // Se o piloto automático estiver ativo e não houver itens com horário vencido,
-    // mas houver itens pendentes sem agendamento, agenda o próximo
+    // mas houver itens pendentes sem agendamento, pega o próximo
     if (duePublications.length === 0 && isAutopilotActive) {
       const nextPending = await prisma.publication.findFirst({
         where: { status: "PENDING" },
@@ -64,9 +64,7 @@ async function handleProcessQueue() {
     }
 
     if (duePublications.length === 0) {
-      // Verifica alerta de fila baixa mesmo quando nada foi disparado
       await checkAndNotifyLowQueue();
-
       return NextResponse.json({
         success: true,
         message: "Nenhuma oferta com horário pendente para este minuto.",
@@ -81,37 +79,75 @@ async function handleProcessQueue() {
     const siteUrl = rawSiteUrl.includes("localhost") ? "https://achadosdananda.vercel.app" : rawSiteUrl;
 
     for (const pub of duePublications) {
-      // 3. Busca grupos vinculados ativos
+      // 🔒 LOCK ATÔMICO ANTI-DUPLICIDADE: Adia imediatamente em 5 min no banco
+      // para que nenhum outro heartbeat concorrente pegue a mesma oferta enquanto ela está sendo enviada
+      await prisma.publication.update({
+        where: { id: pub.id },
+        data: {
+          scheduledFor: new Date(Date.now() + 5 * 60 * 1000),
+        },
+      });
+
+      // 3. Busca grupos vinculados ativos e deduplica por WhatsApp JID
       let targetGroups = pub.publicationGroups
         .map((pg) => pg.group)
         .filter((g) => g && g.whatsappJid && g.isActive);
 
       if (targetGroups.length === 0) {
-        // Se a publicação não tiver grupos amarrados, pega todos os grupos ativos com JID
-        const activeGroups = await prisma.group.findMany({
-          where: { whatsappJid: { not: null }, isActive: true },
-        });
-        targetGroups = activeGroups as any;
+        // Se a publicação não tiver grupos vinculados, direciona para o grupo oficial da Nanda
+        const defaultGroup =
+          (await prisma.group.findFirst({
+            where: { name: { contains: "4" }, whatsappJid: { not: null }, isActive: true },
+          })) ||
+          (await prisma.group.findFirst({
+            where: { whatsappJid: { not: null }, isActive: true },
+            orderBy: { priority: "asc" },
+          }));
+
+        targetGroups = defaultGroup ? ([defaultGroup] as any) : [];
       }
+
+      // Deduplicação estrita de JIDs para impedir múltiplos envios da mesma mensagem
+      const seenJids = new Set<string>();
+      targetGroups = targetGroups.filter((g) => {
+        if (!g.whatsappJid || seenJids.has(g.whatsappJid)) return false;
+        seenJids.add(g.whatsappJid);
+        return true;
+      });
 
       let pubSuccess = false;
       let lastErrorMessage = "";
 
       let messageToSend = pub.generatedText;
 
-      // BLINDAGEM 1: Remove qualquer menção acidental a grupos concorrentes (ex: Promo de Rica)
+      // BLINDAGEM 1: Remove qualquer menção acidental a grupos concorrentes
       messageToSend = messageToSend
         .replace(/Oferta exclusiva encontrada no grupo[^\n]*\n*/gi, "")
         .replace(/encontrad[ao] no grupo[^\n]*\n*/gi, "")
         .replace(/Promo de Rica[^\n]*\n*/gi, "")
+        .replace(/Participe do nosso grupo[^\n]*\n*/gi, "")
+        .replace(/Entre no nosso grupo[^\n]*\n*/gi, "")
+        .replace(/Link do grupo[^\n]*\n*/gi, "")
         .trim();
 
-      // BLINDAGEM 2: Substitui qualquer localhost acidental pelo link de afiliada oficial da Nanda
+      // BLINDAGEM 2: Garante o LINK DIRETO DE AFILIADA oficial (sem localhost e sem redirecionadores intermediários)
       const directAffiliate = pub.offer.affiliateUrl || pub.offer.originalUrl;
-      messageToSend = messageToSend.replace(/http:\/\/localhost:3000\/r\/[^\s]+/gi, directAffiliate || `${siteUrl}/r/${pub.offerId}`);
+      if (directAffiliate) {
+        messageToSend = messageToSend
+          .replace(/https?:\/\/[^\s]*\/r\/[^\s]+/gi, directAffiliate)
+          .replace(/https?:\/\/localhost[^\s]*/gi, directAffiliate);
 
-      // Se a mensagem ainda contiver localhost:
-      messageToSend = messageToSend.replace(/http:\/\/localhost:3000/gi, siteUrl);
+        if (!messageToSend.includes(directAffiliate)) {
+          messageToSend = messageToSend.replace(/https?:\/\/[^\s]+/gi, (matchedUrl) => {
+            if (matchedUrl.includes("unsplash.com") || matchedUrl.includes(".jpg") || matchedUrl.includes(".png")) {
+              return matchedUrl;
+            }
+            return directAffiliate;
+          });
+        }
+      } else {
+        messageToSend = messageToSend.replace(/http:\/\/localhost:3000/gi, siteUrl);
+      }
 
       // Humanização anti-ban: processa spintax no texto da mensagem
       messageToSend = parseSpintax(messageToSend);
@@ -155,9 +191,11 @@ async function handleProcessQueue() {
           });
         }
 
-        // Intervalo humanizado com jitter aleatório entre mensagens (anti-ban)
-        const randomizedDelay = 2000 + Math.floor(Math.random() * 2500);
-        await new Promise((r) => setTimeout(r, randomizedDelay));
+        // Intervalo humanizado se houver mais de um grupo
+        if (targetGroups.length > 1) {
+          const randomizedDelay = 2000 + Math.floor(Math.random() * 2500);
+          await new Promise((r) => setTimeout(r, randomizedDelay));
+        }
       }
 
       // 5. Marca como publicada se disparada com sucesso

@@ -40,17 +40,55 @@ export async function POST(request: Request) {
         } as any,
       ];
     } else if (targetGroups.length === 0) {
-      const activeGroups = await prisma.group.findMany({
-        where: { whatsappJid: { not: null }, isActive: true },
-      });
-      targetGroups = activeGroups as any;
+      const defaultGroup =
+        (await prisma.group.findFirst({
+          where: { name: { contains: "4" }, whatsappJid: { not: null }, isActive: true },
+        })) ||
+        (await prisma.group.findFirst({
+          where: { whatsappJid: { not: null }, isActive: true },
+          orderBy: { priority: "asc" },
+        }));
+      targetGroups = defaultGroup ? ([defaultGroup] as any) : [];
     }
+
+    // Deduplicação estrita de JIDs
+    const seenJids = new Set<string>();
+    targetGroups = targetGroups.filter((g) => {
+      if (!g.whatsappJid || seenJids.has(g.whatsappJid)) return false;
+      seenJids.add(g.whatsappJid);
+      return true;
+    });
 
     if (targetGroups.length === 0 && platform === "EVOLUTION") {
       return NextResponse.json({
         success: false,
         error: "Nenhum grupo do WhatsApp com JID cadastrado foi encontrado.",
       }, { status: 400 });
+    }
+
+    // Prepara texto higienizado com link direto de afiliada oficial
+    let cleanMessage = publication.generatedText
+      .replace(/Oferta exclusiva encontrada no grupo[^\n]*\n*/gi, "")
+      .replace(/encontrad[ao] no grupo[^\n]*\n*/gi, "")
+      .replace(/Promo de Rica[^\n]*\n*/gi, "")
+      .replace(/Participe do nosso grupo[^\n]*\n*/gi, "")
+      .replace(/Entre no nosso grupo[^\n]*\n*/gi, "")
+      .trim();
+
+    const directAffiliate = publication.offer.affiliateUrl || publication.offer.originalUrl;
+    if (directAffiliate) {
+      cleanMessage = cleanMessage
+        .replace(/https?:\/\/[^\s]*\/r\/[^\s]+/gi, directAffiliate)
+        .replace(/https?:\/\/localhost[^\s]*/gi, directAffiliate);
+
+      if (!cleanMessage.includes(directAffiliate)) {
+        cleanMessage = cleanMessage.replace(/https?:\/\/[^\s]+/gi, (matchedUrl) => {
+          if (matchedUrl.includes("unsplash.com") || matchedUrl.includes(".jpg") || matchedUrl.includes(".png")) {
+            return matchedUrl;
+          }
+          return directAffiliate;
+        });
+      }
     }
 
     // 2. Executa disparo via Adapter para cada grupo
@@ -63,7 +101,7 @@ export async function POST(request: Request) {
       const instance = group.instanceName || process.env.EVOLUTION_DEFAULT_INSTANCE || "nanda-principal";
 
       const res = await adapter.distribute({
-        messageText: publication.generatedText,
+        messageText: cleanMessage,
         imageUrl: publication.offer.product.imageUrl,
         targetChannelId: channelJid,
         instanceName: instance,

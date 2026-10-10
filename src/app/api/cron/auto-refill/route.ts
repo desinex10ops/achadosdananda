@@ -201,8 +201,8 @@ async function handleAutoRefill(request: Request) {
       });
 
       // Gera texto da mensagem
-      const siteUrl = process.env.NEXTAUTH_URL || "https://achadosdananda.vercel.app";
-      const trackedLink = `${siteUrl}/r/${offer.id}`;
+      // Gera texto da mensagem com link de afiliada oficial direto
+      const directAffiliateUrl = offer.affiliateUrl || offer.originalUrl;
 
       let generatedText = "";
       if (template) {
@@ -213,13 +213,13 @@ async function handleAutoRefill(request: Request) {
             currentPrice: offer.currentPrice,
             discountPercentage: offer.discountPercentage,
             savedAmount: offer.savedAmount,
-            affiliateUrl: trackedLink,
+            affiliateUrl: directAffiliateUrl,
             marketplaceName: marketplace.name,
           },
           template
         );
       } else {
-        generatedText = `🔥 *${offer.title}*\n\nDe: ~R$ ${offer.originalPrice.toFixed(2)}~\nPor apenas: *R$ ${offer.currentPrice.toFixed(2)}* (${offer.discountPercentage}% OFF)\n\n👇 COMPRE PELO LINK ABAIXO:\n${trackedLink}`;
+        generatedText = `🔥 *${offer.title}*\n\nDe: ~R$ ${offer.originalPrice.toFixed(2)}~\nPor apenas: *R$ ${offer.currentPrice.toFixed(2)}* (${offer.discountPercentage}% OFF)\n\n👇 COMPRE PELO LINK ABAIXO:\n${directAffiliateUrl}`;
       }
 
       // Agenda publicação

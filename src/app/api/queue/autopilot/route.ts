@@ -139,24 +139,47 @@ export async function POST(request: Request) {
             .filter((g) => g && g.whatsappJid && g.isActive);
 
           if (targetGroups.length === 0) {
-            const activeGroups = await prisma.group.findMany({
-              where: { whatsappJid: { not: null }, isActive: true },
-            });
-            targetGroups = activeGroups as any;
+            const defaultGroup =
+              (await prisma.group.findFirst({
+                where: { name: { contains: "4" }, whatsappJid: { not: null }, isActive: true },
+              })) ||
+              (await prisma.group.findFirst({
+                where: { whatsappJid: { not: null }, isActive: true },
+                orderBy: { priority: "asc" },
+              }));
+            targetGroups = defaultGroup ? ([defaultGroup] as any) : [];
           }
 
-          const rawSiteUrl = process.env.NEXTAUTH_URL || "https://achadosdananda.vercel.app";
-          const siteUrl = rawSiteUrl.includes("localhost") ? "https://achadosdananda.vercel.app" : rawSiteUrl;
+          const seenJids = new Set<string>();
+          targetGroups = targetGroups.filter((g) => {
+            if (!g.whatsappJid || seenJids.has(g.whatsappJid)) return false;
+            seenJids.add(g.whatsappJid);
+            return true;
+          });
 
           let cleanText = firstItem.generatedText
             .replace(/Oferta exclusiva encontrada no grupo[^\n]*\n*/gi, "")
             .replace(/encontrad[ao] no grupo[^\n]*\n*/gi, "")
             .replace(/Promo de Rica[^\n]*\n*/gi, "")
+            .replace(/Participe do nosso grupo[^\n]*\n*/gi, "")
+            .replace(/Entre no nosso grupo[^\n]*\n*/gi, "")
             .trim();
 
           const directAffiliate = firstItem.offer.affiliateUrl || firstItem.offer.originalUrl;
-          cleanText = cleanText.replace(/http:\/\/localhost:3000\/r\/[^\s]+/gi, directAffiliate || `${siteUrl}/r/${firstItem.offerId}`);
-          cleanText = cleanText.replace(/http:\/\/localhost:3000/gi, siteUrl);
+          if (directAffiliate) {
+            cleanText = cleanText
+              .replace(/https?:\/\/[^\s]*\/r\/[^\s]+/gi, directAffiliate)
+              .replace(/https?:\/\/localhost[^\s]*/gi, directAffiliate);
+
+            if (!cleanText.includes(directAffiliate)) {
+              cleanText = cleanText.replace(/https?:\/\/[^\s]+/gi, (matchedUrl) => {
+                if (matchedUrl.includes("unsplash.com") || matchedUrl.includes(".jpg") || matchedUrl.includes(".png")) {
+                  return matchedUrl;
+                }
+                return directAffiliate;
+              });
+            }
+          }
 
           let anySuccess = false;
           for (const group of targetGroups) {
