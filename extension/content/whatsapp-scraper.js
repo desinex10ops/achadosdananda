@@ -54,7 +54,7 @@
         action: 'QUEUE',
       }));
 
-      const targetGroups = groupIds.length > 0 ? groupIds : ['cmuyvtbad0001dnoffbw3o3e8'];
+      const targetGroups = groupIds.length > 0 ? groupIds : ['cmv0dcble0001e4akchs66b3y'];
 
       if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
         chrome.runtime.sendMessage(
@@ -776,8 +776,8 @@
           marketplace: detectMarketplace(thisUrls[0] || ''),
         };
 
-        showToast('🚀 Enviando oferta para a Fila de Disparo...');
-        const res = await sendToQueueViaServiceWorker([offerToSend], ['cmuyvtbad0001dnoffbw3o3e8']);
+        showToast('🚀 Enviando oferta para a Fila de Disparo (PROMO MODA & BELEZA #4)...');
+        const res = await sendToQueueViaServiceWorker([offerToSend], ['cmv0dcble0001e4akchs66b3y']);
         if (res && res.success) {
           showToast(`🎉 <b>Oferta enviada para a Fila!</b> (Grupo: PROMO MODA & BELEZA #4)`);
         } else {
@@ -838,6 +838,26 @@
       </div>
 
       <div id="nanda-wpp-widget-body">
+        <!-- BANNER DE ESPELHAMENTO AUTOMÁTICO ATIVO -->
+        <div id="nanda-wpp-mirror-banner" style="
+          background: rgba(236, 72, 153, 0.15);
+          border: 1px solid rgba(236, 72, 153, 0.4);
+          padding: 6px 10px;
+          border-radius: 8px;
+          margin-bottom: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        ">
+          <div>
+            <div style="font-size: 10px; font-weight: 700; color: #f472b6; display: flex; align-items: center; gap: 4px;">
+              <span>🔄</span> Espelhando: Promo de Rica
+            </div>
+            <div style="font-size: 9px; color: #cbd5e1; margin-top: 1px;">Destino: PROMO MODA & BELEZA #4</div>
+          </div>
+          <span style="font-size: 9px; font-weight: 800; background: #10b981; color: #000; padding: 2px 6px; border-radius: 99px;">ATIVO</span>
+        </div>
+
         <div style="background: rgba(255, 255, 255, 0.05); padding: 7px 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
           <span style="color: #94a3b8; font-size: 11px;">Ofertas Capturadas:</span>
           <span id="nanda-wpp-queue-badge" style="font-size: 16px; font-weight: 800; color: #38bdf8;">0</span>
@@ -986,7 +1006,7 @@
       }
 
       showToast(`🚀 Enviando ${offers.length} ofertas para a Fila de Disparo (PROMO MODA & BELEZA #4)...`);
-      const res = await sendToQueueViaServiceWorker(offers, ['cmuyvtbad0001dnoffbw3o3e8']);
+      const res = await sendToQueueViaServiceWorker(offers, ['cmv0dcble0001e4akchs66b3y']);
       if (res && res.success) {
         showToast(`🎉 <b>Sucesso!</b> ${offers.length} ofertas enviadas para a Fila (Grupo: PROMO MODA & BELEZA #4)!`);
       } else {
@@ -1594,6 +1614,35 @@
     }
   }
 
+  // =======================================================================
+  // ESPELHAMENTO AUTOMÁTICO EM TEMPO REAL: PROMO DE RICA -> MODA & BELEZA #4
+  // =======================================================================
+  const mirroredOffersSent = new Set();
+  let isMirroringActive = true;
+
+  async function checkAndAutoMirrorPromoDeRica() {
+    if (!isMirroringActive) return;
+    const headerTitle = (document.querySelector('#main header')?.innerText || '').toLowerCase();
+    if (!headerTitle.includes('promo de rica') && !headerTitle.includes('promorica') && !headerTitle.includes('rica')) return;
+
+    const offers = extractAllChatOffers();
+    const newOffers = offers.filter(o => !mirroredOffersSent.has(o.url));
+    if (newOffers.length === 0) return;
+
+    for (const o of newOffers) {
+      mirroredOffersSent.add(o.url);
+    }
+
+    try {
+      const res = await sendToQueueViaServiceWorker(newOffers, ['cmv0dcble0001e4akchs66b3y']);
+      if (res && res.success) {
+        showToast(`🔄 <b>${newOffers.length} Oferta(s) Espelhada(s)!</b> De Promo de Rica para PROMO MODA & BELEZA #4 com seu link!`);
+      }
+    } catch (err) {
+      console.warn('[Espelhamento] Erro ao auto-espelhar:', err);
+    }
+  }
+
   // Observa mudanças no DOM com debounce inteligente e proteção contra loops de CPU
   let domUpdateTimeout = null;
   let isUpdatingDom = false;
@@ -1619,6 +1668,7 @@
         extractAllChatOffers();
         injectCloneButtons();
         injectFloatingBar();
+        checkAndAutoMirrorPromoDeRica();
       } finally {
         setTimeout(() => { isUpdatingDom = false; }, 200);
       }
@@ -1631,6 +1681,7 @@
     extractAllChatOffers();
     injectCloneButtons();
     injectFloatingBar();
+    checkAndAutoMirrorPromoDeRica();
   }, 1500);
 
   // 18. Listener para o Popup da Extensão
