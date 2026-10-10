@@ -509,7 +509,19 @@ export class ShopeeAffiliateService {
         }
 
         if (rawNodes && rawNodes.length > 0) {
-          const items: ShopeeProductItem[] = rawNodes.map((n: any, idx: number) => {
+          // Filtra anúncios de teste ou spam de lojistas (ex: "[TESTE - NÃO COMPRE]")
+          const validNodes = rawNodes.filter((n: any) => {
+            const title = (n.productName || "").toLowerCase();
+            const price = Number(n.priceMin || n.price || 0);
+            if (title.includes("não compre") || title.includes("nao compre") || title.includes("não comprar")) return false;
+            if (title.includes("produto teste") || title.includes("imagem teste")) return false;
+            if (price < 2.5 && title.includes("teste")) return false;
+            return true;
+          });
+
+          const nodesToUse = validNodes.length > 0 ? validNodes : rawNodes;
+
+          const items: ShopeeProductItem[] = nodesToUse.map((n: any, idx: number) => {
             const currentPrice = Number(n.priceMin || n.price || 0);
             const discountPct = Number(n.priceDiscountRate || 0);
             const originalPrice = discountPct > 0 ? currentPrice / (1 - discountPct / 100) : currentPrice;

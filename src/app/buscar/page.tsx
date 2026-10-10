@@ -77,7 +77,7 @@ export default function BuscarProdutosPage() {
   // Filtros de Busca Shopee
   const [keyword, setKeyword] = useState("");
   const [category, setCategory] = useState("Todas as categorias");
-  const [sort, setSort] = useState("DISCOUNT_DESC");
+  const [sort, setSort] = useState("RELEVANCE");
   const [productType, setProductType] = useState("TODOS");
   const [limit, setLimit] = useState(100);
   const [topSellersOnly, setTopSellersOnly] = useState(false);
@@ -905,6 +905,7 @@ export default function BuscarProdutosPage() {
                 Populares:
               </span>
               {[
+                { label: "👔 Camisas", query: "camisa masculina" },
                 { label: "CeraVe", query: "cerave" },
                 { label: "Air Fryer", query: "air fryer" },
                 { label: "Vestidos", query: "vestido" },
