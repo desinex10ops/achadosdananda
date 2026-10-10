@@ -32,6 +32,9 @@ import {
   Wand2,
   Image as ImageIcon,
   Trash2,
+  FolderOpen,
+  FolderPlus,
+  Calendar,
 } from "lucide-react";
 
 interface ShopeeProduct {
@@ -108,6 +111,19 @@ export default function BuscarProdutosPage() {
   const [showWithCoupon, setShowWithCoupon] = useState(true);
   const [secondaryTitle, setSecondaryTitle] = useState("high ticket");
   const [aiCtaGenerated, setAiCtaGenerated] = useState(false);
+
+  // Modal de Salvar Fila Exclusiva (Selecionar Fila)
+  const [isSaveQueueModalOpen, setIsSaveQueueModalOpen] = useState(false);
+  const [saveTargetSource, setSaveTargetSource] = useState<"shopee" | "meli">("shopee");
+  const [queueMode, setQueueMode] = useState<"NEW" | "EXISTING">("NEW");
+  const [newQueueName, setNewQueueName] = useState("");
+  const [newQueueCategory, setNewQueueCategory] = useState("Moda & Beleza");
+  const [newQueueDate, setNewQueueDate] = useState("");
+  const [existingQueueId, setExistingQueueId] = useState("");
+  const [existingBatches, setExistingBatches] = useState<
+    Array<{ id: string; name: string; category: string; date: string; totalItems: number }>
+  >([]);
+  const [loadingBatches, setLoadingBatches] = useState(false);
 
   // Ações & Notificações
   const [savingBulk, setSavingBulk] = useState(false);
@@ -300,76 +316,146 @@ export default function BuscarProdutosPage() {
     showToast("🧹 Lista e links limpos com sucesso!");
   };
 
-  // Salvar Produtos Selecionados em Lote (Shopee)
-  const handleSaveSelected = async () => {
-    if (selectedIds.size === 0) {
-      showToast("Selecione pelo menos um produto para salvar.");
+  // Abrir Modal de Salvar Fila Exclusiva
+  const handleOpenSaveModal = async (source: "shopee" | "meli") => {
+    const isShopee = source === "shopee";
+    const count = isShopee ? selectedIds.size : selectedMeliIds.size;
+    if (count === 0) {
+      showToast("Selecione pelo menos um produto para salvar na fila.");
       return;
     }
 
-    setSavingBulk(true);
-    try {
-      const selectedProducts = products.filter((p) => selectedIds.has(p.id));
-      const res = await fetch("/api/marketplaces/shopee/save-bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products: selectedProducts, sendToQueue: true }),
-      });
+    setSaveTargetSource(source);
+    setQueueMode("NEW");
 
-      const json = await res.json();
-      if (json.success) {
-        showToast(`🎉 ${json.message}`);
-        setSelectedIds(new Set());
-      } else {
-        showToast(`❌ Erro: ${json.error || "Não foi possível salvar"}`);
+    // Detecção inteligente da categoria
+    let detectedCategory = "Moda & Beleza";
+    const currentCatLower = (category || "").toLowerCase();
+    const currentKwLower = (keyword || "").toLowerCase();
+
+    if (currentCatLower.includes("casa") || currentCatLower.includes("cozinha")) {
+      detectedCategory = "Casa & Cozinha";
+    } else if (currentCatLower.includes("eletrônicos") || currentCatLower.includes("tech")) {
+      detectedCategory = "Eletrônicos & Tech";
+    } else if (currentCatLower.includes("beleza") || currentCatLower.includes("moda")) {
+      detectedCategory = "Moda & Beleza";
+    } else if (currentKwLower) {
+      if (currentKwLower.includes("fone") || currentKwLower.includes("celular") || currentKwLower.includes("smart") || currentKwLower.includes("pc")) {
+        detectedCategory = "Eletrônicos & Tech";
+      } else if (currentKwLower.includes("casa") || currentKwLower.includes("air fryer") || currentKwLower.includes("panela") || currentKwLower.includes("decor")) {
+        detectedCategory = "Casa & Cozinha";
+      } else if (currentKwLower.includes("bebe") || currentKwLower.includes("bebê") || currentKwLower.includes("fralda") || currentKwLower.includes("infantil")) {
+        detectedCategory = "Bebê & Infantil";
+      } else if (currentKwLower.includes("pet") || currentKwLower.includes("mercado") || currentKwLower.includes("ração")) {
+        detectedCategory = "Mercado & Pet";
       }
-    } catch {
-      showToast("❌ Falha ao salvar os produtos selecionados.");
-    } finally {
-      setSavingBulk(false);
     }
+
+    const todayStr = new Date().toISOString().split("T")[0];
+    const dateBR = new Date().toLocaleDateString("pt-BR");
+    setNewQueueCategory(detectedCategory);
+    setNewQueueName(`Fila - ${detectedCategory} - ${dateBR}`);
+    setNewQueueDate(todayStr);
+
+    // Carregar batches existentes
+    try {
+      setLoadingBatches(true);
+      const res = await fetch("/api/queue/batches");
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setExistingBatches(json.data);
+        if (json.data.length > 0) {
+          setExistingQueueId(json.data[0].id);
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao carregar batches:", e);
+    } finally {
+      setLoadingBatches(false);
+    }
+
+    setIsSaveQueueModalOpen(true);
   };
 
-  // Salvar Lote Mercado Livre com Personalização de Disparo
-  const handleConfirmMeliDispatch = async () => {
-    const selectedItems = meliProducts.filter((p) => selectedMeliIds.has(p.id));
-    if (selectedItems.length === 0) {
+  // Confirmar Salvar Produtos na Fila
+  const handleConfirmSaveQueue = async () => {
+    const isShopee = saveTargetSource === "shopee";
+    const selectedProducts = isShopee
+      ? products.filter((p) => selectedIds.has(p.id))
+      : meliProducts.filter((p) => selectedMeliIds.has(p.id)).map((p) => ({
+          ...p,
+          salesCount: 500,
+          rating: 4.8,
+          commissionRate: 8.0,
+          shopName: "Mercado Livre Oficial",
+          isTopSeller: true,
+          hasExtraCommission: false,
+        }));
+
+    if (selectedProducts.length === 0) {
       showToast("Nenhum produto selecionado para salvar.");
       return;
     }
 
     setSavingBulk(true);
     try {
+      const payload: any = {
+        products: selectedProducts,
+        sendToQueue: true,
+      };
+
+      if (queueMode === "NEW") {
+        if (!newQueueName.trim()) {
+          showToast("⚠️ Digite um nome para a fila.");
+          setSavingBulk(false);
+          return;
+        }
+        payload.batchName = newQueueName.trim();
+        payload.batchCategory = newQueueCategory;
+        payload.batchDate = newQueueDate ? new Date(newQueueDate).toISOString() : new Date().toISOString();
+      } else {
+        if (!existingQueueId) {
+          showToast("⚠️ Selecione uma fila existente.");
+          setSavingBulk(false);
+          return;
+        }
+        payload.batchId = existingQueueId;
+      }
+
       const res = await fetch("/api/marketplaces/shopee/save-bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          products: selectedItems.map((p) => ({
-            ...p,
-            salesCount: 500,
-            rating: 4.8,
-            commissionRate: 8.0,
-            shopName: "Mercado Livre Oficial",
-            isTopSeller: true,
-            hasExtraCommission: false,
-          })),
-          sendToQueue: true,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
       if (json.success) {
-        showToast(`🎉 ${selectedItems.length} produtos do Mercado Livre adicionados à Fila de Disparo!`);
-        setIsDispatchModalOpen(false);
-        setSelectedMeliIds(new Set());
+        showToast(`🎉 ${json.message || "Ofertas salvas na fila com sucesso!"}`);
+        setIsSaveQueueModalOpen(false);
+        if (isShopee) {
+          setSelectedIds(new Set());
+        } else {
+          setSelectedMeliIds(new Set());
+          setIsDispatchModalOpen(false);
+        }
       } else {
-        showToast(`❌ Erro: ${json.error}`);
+        showToast(`❌ Erro: ${json.error || "Não foi possível salvar"}`);
       }
     } catch {
-      showToast("❌ Falha ao enviar para fila.");
+      showToast("❌ Falha de conexão ao salvar na fila.");
     } finally {
       setSavingBulk(false);
     }
+  };
+
+  // Salvar Produtos Selecionados em Lote (Shopee)
+  const handleSaveSelected = () => {
+    handleOpenSaveModal("shopee");
+  };
+
+  // Salvar Lote Mercado Livre com Personalização de Disparo
+  const handleConfirmMeliDispatch = () => {
+    handleOpenSaveModal("meli");
   };
 
   // Copiar Texto + Link de Afiliado Formatado
@@ -694,7 +780,7 @@ export default function BuscarProdutosPage() {
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setIsDispatchModalOpen(true)}
+                onClick={() => handleOpenSaveModal("meli")}
                 disabled={selectedMeliIds.size === 0}
                 className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-extrabold text-xs px-6 py-2 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-950/40 disabled:opacity-40"
               >
@@ -1525,6 +1611,176 @@ export default function BuscarProdutosPage() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: SELECIONAR / CRIAR FILA EXCLUSIVA                                  */}
+      {/* ========================================================================= */}
+      {isSaveQueueModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#121215] border border-zinc-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+            <button
+              onClick={() => setIsSaveQueueModalOpen(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-orange-950/60 border border-orange-500/40 rounded-xl text-orange-400">
+                <FolderPlus className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  Salvar na Fila de Publicações
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-zinc-950">
+                    {saveTargetSource === "shopee" ? selectedIds.size : selectedMeliIds.size} itens
+                  </span>
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Crie uma fila exclusiva com data e categoria ou adicione a uma fila existente.
+                </p>
+              </div>
+            </div>
+
+            {/* Alternador de Modo: Nova Fila vs Fila Existente */}
+            <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-xl border border-zinc-800 mb-5">
+              <button
+                type="button"
+                onClick={() => setQueueMode("NEW")}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  queueMode === "NEW"
+                    ? "bg-orange-600 text-white shadow-md"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <FolderPlus className="w-3.5 h-3.5" />
+                Criar Nova Fila Exclusiva
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueueMode("EXISTING")}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  queueMode === "EXISTING"
+                    ? "bg-orange-600 text-white shadow-md"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                Fila Existente ({existingBatches.length})
+              </button>
+            </div>
+
+            {/* Formulário: Nova Fila */}
+            {queueMode === "NEW" ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                    Nome da Fila:
+                  </label>
+                  <input
+                    type="text"
+                    value={newQueueName}
+                    onChange={(e) => setNewQueueName(e.target.value)}
+                    placeholder="Ex: Fila - Moda & Beleza - 10/10/2026"
+                    className="w-full bg-zinc-900 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-orange-500 focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                    Categoria da Fila:
+                  </label>
+                  <select
+                    value={newQueueCategory}
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      setNewQueueCategory(newCat);
+                      const dateBR = new Date().toLocaleDateString("pt-BR");
+                      setNewQueueName(`Fila - ${newCat} - ${dateBR}`);
+                    }}
+                    className="w-full bg-zinc-900 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-orange-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="Moda & Beleza">👗 Moda & Beleza</option>
+                    <option value="Casa & Cozinha">🏠 Casa & Cozinha</option>
+                    <option value="Eletrônicos & Tech">💻 Eletrônicos & Tech</option>
+                    <option value="Bebê & Infantil">🍼 Bebê & Infantil</option>
+                    <option value="Mercado & Pet">🛒 Mercado & Pet</option>
+                    <option value="Geral">✨ Geral / Achados</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                    Data de Programação da Fila:
+                  </label>
+                  <input
+                    type="date"
+                    value={newQueueDate}
+                    onChange={(e) => setNewQueueDate(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            ) : (
+              /* Formulário: Fila Existente */
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                    Selecione a Fila de Destino:
+                  </label>
+                  {existingBatches.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-center text-xs text-zinc-400">
+                      Nenhuma fila criada anteriormente. Alterne para <strong>Criar Nova Fila Exclusiva</strong> acima.
+                    </div>
+                  ) : (
+                    <select
+                      value={existingQueueId}
+                      onChange={(e) => setExistingQueueId(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-orange-500 focus:outline-none cursor-pointer"
+                    >
+                      {existingBatches.map((b) => {
+                        const dateStr = b.date
+                          ? new Date(b.date).toLocaleDateString("pt-BR")
+                          : "";
+                        return (
+                          <option key={b.id} value={b.id}>
+                            📁 {b.name} • {b.category} • {dateStr} ({b.totalItems} ofertas)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Ações do Modal */}
+            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setIsSaveQueueModalOpen(false)}
+                className="text-xs text-zinc-400 hover:text-white px-3 py-2"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSaveQueue}
+                disabled={savingBulk || (queueMode === "EXISTING" && existingBatches.length === 0)}
+                className="bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-orange-950/40 disabled:opacity-40"
+              >
+                {savingBulk ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                Salvar na Fila
+              </button>
+            </div>
           </div>
         </div>
       )}

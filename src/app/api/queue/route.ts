@@ -7,15 +7,20 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
+    const batchId = searchParams.get("batchId");
 
     const where: any = {};
     if (status) {
       where.status = status;
     }
+    if (batchId && batchId !== "ALL") {
+      where.queueBatchId = batchId;
+    }
 
     const publications = await prisma.publication.findMany({
       where,
       include: {
+        queueBatch: true,
         offer: {
           include: {
             product: true,

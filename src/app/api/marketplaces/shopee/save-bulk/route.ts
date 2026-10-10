@@ -8,13 +8,34 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { products, sendToQueue = true } = body;
+    const {
+      products,
+      sendToQueue = true,
+      batchId,
+      batchName,
+      batchCategory,
+      batchDate,
+    } = body;
 
     if (!Array.isArray(products) || products.length === 0) {
       return NextResponse.json(
         { success: false, error: "Nenhum produto foi fornecido para salvar." },
         { status: 400 }
       );
+    }
+
+    // Se foi fornecido um nome de nova fila exclusiva, cria o QueueBatch
+    let targetBatchId = batchId || null;
+    if (batchName && batchName.trim()) {
+      const createdBatch = await prisma.queueBatch.create({
+        data: {
+          name: batchName.trim(),
+          category: batchCategory?.trim() || "Geral",
+          date: batchDate ? new Date(batchDate) : new Date(),
+          status: "ACTIVE",
+        },
+      });
+      targetBatchId = createdBatch.id;
     }
 
     // 1. Garantir existência do Marketplace Shopee
@@ -169,6 +190,7 @@ export async function POST(request: Request) {
             data: {
               offerId: offer.id,
               templateId: template.id,
+              queueBatchId: targetBatchId,
               status: "PENDING",
               orderIndex: currentOrderIndex++,
               generatedText,
