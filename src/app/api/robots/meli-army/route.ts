@@ -10,8 +10,15 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get("refresh") === "true";
+    const searchQuery = searchParams.get("q") || undefined;
+    const onlyFemale = searchParams.get("onlyFemale") === "true";
 
-    const scanResult = await MeliRobotArmyService.runArmyScan(undefined, forceRefresh);
+    const scanResult = await MeliRobotArmyService.runArmyScan(
+      undefined,
+      forceRefresh,
+      searchQuery,
+      onlyFemale
+    );
 
     let groups: any[] = [];
     try {
@@ -47,6 +54,22 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { action } = body;
+
+    // AÇÃO 0: Buscar produto específico ao vivo no Mercado Livre ou filtrar Só Produtos Femininos
+    if (action === "SEARCH_QUERY") {
+      const query = String(body.query || "").trim();
+      const onlyFemale = Boolean(body.onlyFemale);
+      const scanResult = await MeliRobotArmyService.runArmyScan(
+        undefined,
+        true,
+        query,
+        onlyFemale
+      );
+      return NextResponse.json({
+        success: true,
+        ...scanResult,
+      });
+    }
 
     // AÇÃO 1: Varrer URLs específicas do Mercado Livre ao vivo
     if (action === "SCAN_URLS") {

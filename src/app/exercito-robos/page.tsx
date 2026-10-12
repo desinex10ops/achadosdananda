@@ -93,11 +93,14 @@ export default function ExercitoRobosPage() {
   const [scanningUrls, setScanningUrls] = useState(false);
   const [dispatching, setDispatching] = useState<string | null>(null);
 
-  // Filtros de visualização
+  // Filtros de visualização e Busca Ao Vivo por Produto Específico / Público Feminino
   const [selectedNiche, setSelectedNiche] = useState<string>("all");
   const [selectedCouponCode, setSelectedCouponCode] = useState<string>("ALL");
   const [onlyWithCoupon, setOnlyWithCoupon] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [liveProductQuery, setLiveProductQuery] = useState<string>("");
+  const [activeSearchedTerm, setActiveSearchedTerm] = useState<string>("");
+  const [onlyFemaleProducts, setOnlyFemaleProducts] = useState<boolean>(false);
 
   const [selectedCouponByDeal, setSelectedCouponByDeal] = useState<Record<string, string>>({});
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -115,12 +118,20 @@ export default function ExercitoRobosPage() {
 
   const [feedbackBanner, setFeedbackBanner] = useState<string | null>(null);
 
-  const loadArmyData = async (forceRefresh = false) => {
+  const loadArmyData = async (
+    forceRefresh = false,
+    customSearchTerm = "",
+    femaleOnly = false
+  ) => {
     try {
       setLoading(true);
-      const res = await fetch(
-        `/api/robots/meli-army${forceRefresh ? "?refresh=true" : ""}`
-      );
+      const params = new URLSearchParams();
+      if (forceRefresh) params.set("refresh", "true");
+      if (customSearchTerm.trim()) params.set("q", customSearchTerm.trim());
+      if (femaleOnly) params.set("onlyFemale", "true");
+
+      const qs = params.toString();
+      const res = await fetch(`/api/robots/meli-army${qs ? `?${qs}` : ""}`);
       const json = await res.json();
       if (json.success) {
         setRobots(json.robots || []);
@@ -135,8 +146,37 @@ export default function ExercitoRobosPage() {
     }
   };
 
+  const handleExecuteLiveProductSearch = async (
+    termToSearch: string,
+    femaleOnly: boolean
+  ) => {
+    setLiveProductQuery(termToSearch);
+    setActiveSearchedTerm(termToSearch.trim());
+    setOnlyFemaleProducts(femaleOnly);
+    setSelectedNiche("all");
+    setSearchQuery("");
+    await loadArmyData(true, termToSearch, femaleOnly);
+    if (termToSearch.trim() && femaleOnly) {
+      setFeedbackBanner(
+        `👩🔍 Robôs buscaram "${termToSearch}" filtrando apenas produtos femininos (${affiliateTagLabel})!`
+      );
+    } else if (termToSearch.trim()) {
+      setFeedbackBanner(
+        `🔍 Robôs buscaram ofertas reais para "${termToSearch}" no Mercado Livre!`
+      );
+    } else if (femaleOnly) {
+      setFeedbackBanner(
+        `👩 Modo "Só Produtos Femininos" ativado! Exibindo Perfumaria, Beleza, Moda, Bolsas e Calçados Femininos.`
+      );
+    } else {
+      setFeedbackBanner(`🔥 Exibindo todas as Ofertas do Dia do Mercado Livre.`);
+    }
+  };
+
+  const affiliateTagLabel = "clma9212398";
+
   useEffect(() => {
-    loadArmyData(false);
+    loadArmyData(false, "", false);
   }, []);
 
   const handleScanCustomLinks = async (e: React.FormEvent) => {
@@ -630,44 +670,152 @@ export default function ExercitoRobosPage() {
         </div>
       </div>
 
-      {/* SEÇÃO 3: Barra de Controle & Ação em Lote */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 flex-1">
-          <div className="relative flex-1 min-w-[220px] max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filtrar produto garimpado pelo nome ou MLB..."
-              className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:border-rose-500"
-            />
+      {/* SEÇÃO 3: Caçador de Produto Específico (Ex: Perfume Boticário) & Modo Só Produtos Femininos */}
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-rose-200 shadow-sm space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <Search className="w-4 h-4 text-rose-600" />
+              <span>Caçador de Produto Específico &amp; Universo Feminino</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Busque qualquer produto ou marca específica no Mercado Livre (ex: <b>Perfume Boticário</b>, <b>Bolsa Feminina</b>, <b>Vestido</b>) ou ative o modo exclusivo <b>Só Produtos Femininos</b>.
+            </p>
           </div>
 
-          <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
-            <input
-              type="checkbox"
-              checked={onlyWithCoupon}
-              onChange={(e) => setOnlyWithCoupon(e.target.checked)}
-              className="rounded text-rose-600 focus:ring-rose-500"
-            />
-            <span>🎟️ Mostrar apenas produtos com Cupom Real ({deals.filter((d) => d.bestCoupon).length})</span>
-          </label>
+          {/* Botão Destaque: Só Produtos Femininos */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                handleExecuteLiveProductSearch(liveProductQuery, !onlyFemaleProducts)
+              }
+              disabled={loading}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-extrabold text-xs transition shadow-sm ${
+                onlyFemaleProducts
+                  ? "bg-pink-600 text-white ring-2 ring-pink-300"
+                  : "bg-pink-50 hover:bg-pink-100 text-pink-800 border border-pink-200"
+              }`}
+            >
+              <span>👩 {onlyFemaleProducts ? "Modo Só Produtos Femininos: ATIVO" : "Ver Só Produtos Femininos"}</span>
+            </button>
+
+            {(activeSearchedTerm || onlyFemaleProducts) && (
+              <button
+                type="button"
+                onClick={() => handleExecuteLiveProductSearch("", false)}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition"
+              >
+                <span>🔥 Voltar p/ Ofertas Gerais do Dia</span>
+              </button>
+            )}
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleDispatchFilteredBatch}
-          disabled={filteredDeals.length === 0 || dispatching !== null}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-md transition active:scale-95"
+        {/* Barra de Busca Direta no Mercado Livre */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleExecuteLiveProductSearch(liveProductQuery, onlyFemaleProducts);
+          }}
+          className="flex flex-col sm:flex-row gap-2.5"
         >
-          <Zap className="w-4 h-4" />
-          <span>
-            {dispatching === "BATCH"
-              ? "Enfileirando por Nicho..."
-              : `Enfileirar Lote (${Math.min(filteredDeals.length, 10)} itens)`}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-rose-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={liveProductQuery}
+              onChange={(e) => setLiveProductQuery(e.target.value)}
+              placeholder="Digite um produto específico (Ex: perfume boticário, floratta, vestido feminino, bolsa, maquiagem)..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-rose-600 disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm shadow-sm transition active:scale-95 shrink-0"
+          >
+            <Search className="w-4 h-4" />
+            <span>{loading ? "Garimpando no ML..." : "Buscar Produto no ML"}</span>
+          </button>
+        </form>
+
+        {/* Atalhos Rápidos de 1 Clique (Marcas & Categorias Femininas) */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">
+            Atalhos Rápidos:
           </span>
-        </button>
+          {[
+            { label: "👩 Só Produtos Femininos (Todos)", query: "", female: true },
+            { label: "🌸 Perfume O Boticário", query: "perfume boticario", female: true },
+            { label: "💜 Eudora & Natura", query: "eudora natura perfume", female: true },
+            { label: "👗 Vestidos & Moda Feminina", query: "vestido moda feminina", female: true },
+            { label: "👜 Bolsas Femininas", query: "bolsa feminina", female: true },
+            { label: "👠 Sandálias & Calçados", query: "sandalia feminina", female: true },
+            { label: "💄 Maquiagem & Skincare", query: "maquiagem skincare", female: true },
+            { label: "💇‍♀️ Cabelos (Secador / Escova)", query: "secador escova cabelo", female: true },
+          ].map((preset) => {
+            const isSelected =
+              activeSearchedTerm === preset.query &&
+              onlyFemaleProducts === preset.female &&
+              (preset.query !== "" || onlyFemaleProducts);
+            return (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => handleExecuteLiveProductSearch(preset.query, preset.female)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition ${
+                  isSelected
+                    ? "bg-rose-600 text-white border-rose-600 shadow-sm"
+                    : "bg-rose-50/60 hover:bg-rose-100/80 text-slate-800 border-rose-200/80"
+                }`}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sub-barra: Filtro rápido nos resultados + Enfileirar Lote */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 flex-1">
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Refinar dentro dos resultados exibidos..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl">
+              <input
+                type="checkbox"
+                checked={onlyWithCoupon}
+                onChange={(e) => setOnlyWithCoupon(e.target.checked)}
+                className="rounded text-rose-600 focus:ring-rose-500"
+              />
+              <span>🎟️ Só com Cupom Disponível ({deals.filter((d) => d.bestCoupon).length})</span>
+            </label>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleDispatchFilteredBatch}
+            disabled={filteredDeals.length === 0 || dispatching !== null}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-md transition active:scale-95"
+          >
+            <Zap className="w-4 h-4" />
+            <span>
+              {dispatching === "BATCH"
+                ? "Enfileirando por Nicho..."
+                : `Enfileirar Lote (${Math.min(filteredDeals.length, 10)} itens)`}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* SEÇÃO 4: Grade de Ofertas Reais Garimpadas + Matemática do Cupom */}
