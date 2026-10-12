@@ -27,6 +27,7 @@ import {
   Radio,
   Smartphone,
   GitFork,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +52,12 @@ export function Sidebar({ isOpenMobile, onCloseMobile }: SidebarProps) {
       href: "/",
       icon: LayoutDashboard,
       active: pathname === "/",
+    },
+    {
+      name: "Exército de Robôs ML",
+      href: "/exercito-robos",
+      icon: Bot,
+      active: pathname === "/exercito-robos",
     },
     {
       name: "Buscar Produtos",
