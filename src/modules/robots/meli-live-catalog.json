@@ -134,14 +134,14 @@
     "salesCountText": "+10mil vendidos",
     "isFull": true,
     "onPageCoupon": {
-      "label": "R$ 1945 OFF no Anúncio",
+      "label": "R$ 44 OFF no Anúncio",
       "discountType": "FIXED",
-      "discountValue": 1945
+      "discountValue": 44
     }
   },
   {
     "itemId": "MLB40494896",
-    "title": "Kit 5 Refletores LED 100W IP67 à Prova D&#x27;Água 6500K Branco Frio Bivolt",
+    "title": "Kit 5 Refletores LED 100W IP67 à Prova D'Água 6500K Branco Frio Bivolt",
     "originalPrice": 199.98,
     "currentPrice": 68.62,
     "discountPercentage": 65,
@@ -274,9 +274,9 @@
     "salesCountText": "+10mil vendidos",
     "isFull": true,
     "onPageCoupon": {
-      "label": "R$ 74 OFF no Anúncio",
+      "label": "R$ 15 OFF no Anúncio",
       "discountType": "FIXED",
-      "discountValue": 74
+      "discountValue": 15
     }
   },
   {
@@ -365,7 +365,7 @@
   },
   {
     "itemId": "MLB60074213",
-    "title": "Câmera de Segurança Wi-Fi iCSee/Yoosee A28B 4K Dupla Lente Visão Noturna Colorida Full Hd Externa Prova D&#x27;água Ip66 Sensor Movimento Woosh",
+    "title": "Câmera de Segurança Wi-Fi iCSee/Yoosee A28B 4K Dupla Lente Visão Noturna Colorida Full Hd Externa Prova D'água Ip66 Sensor Movimento Woosh",
     "originalPrice": 399,
     "currentPrice": 106,
     "discountPercentage": 73,
@@ -401,7 +401,7 @@
   },
   {
     "itemId": "MLB65952157",
-    "title": "Smartphone Samsung Galaxy A36 5g 128gb 6gb Ram Câmera Tripla De Até 50mp Selfie De 12mp Ip67 Super Amoled 6.7&#x27;&#x27; Nfc Recursos Ai Android E Segurança Snapdragon - Preto",
+    "title": "Smartphone Samsung Galaxy A36 5g 128gb 6gb Ram Câmera Tripla De Até 50mp Selfie De 12mp Ip67 Super Amoled 6.7'' Nfc Recursos Ai Android E Segurança Snapdragon - Preto",
     "originalPrice": 2538,
     "currentPrice": 1269,
     "discountPercentage": 50,
@@ -501,7 +501,7 @@
   },
   {
     "itemId": "MLB77246396",
-    "title": "Relógio Smartwatch Forestory R1 Smart Watch Inteligente Redondo Bluetooth Ip68 À Prova D&#x27;água Notificações Chamadas Relogio Corrida com Android e iOS Com 2 Pulseiras Feminino Masculino Alumínio",
+    "title": "Relógio Smartwatch Forestory R1 Smart Watch Inteligente Redondo Bluetooth Ip68 À Prova D'água Notificações Chamadas Relogio Corrida com Android e iOS Com 2 Pulseiras Feminino Masculino Alumínio",
     "originalPrice": 419,
     "currentPrice": 99.25,
     "discountPercentage": 76,
@@ -685,7 +685,7 @@
   },
   {
     "itemId": "MLB51986596",
-    "title": "Barbeador e Aparador Elétrico Philips OneBlade com Pente 5 em 1, Sem Fio e À Prova D&#x27;Água - QP1425/10",
+    "title": "Barbeador e Aparador Elétrico Philips OneBlade com Pente 5 em 1, Sem Fio e À Prova D'Água - QP1425/10",
     "originalPrice": 212.38,
     "currentPrice": 139,
     "discountPercentage": 34,
@@ -753,7 +753,7 @@
     "originalPrice": 3499,
     "currentPrice": 2099,
     "discountPercentage": 40,
-    "imageUrl": "https://http2.mlstatic.com/D_Q_NP_2X_753324-MLA108743670040_032026-AB.webp",
+    "imageUrl": "https://http2.mlstatic.com/D_Q_NP_2X_750412-MLA108743699852_032026-AB.webp",
     "originalUrl": "https://www.mercadolivre.com.br/smart-tv-philco-50-p50vik-4k-uhd-led-roku-dolby-audio-wi-fi-hdr10-110220v/p/MLB67267597",
     "salesCountText": "+10mil vendidos",
     "isFull": true,
@@ -835,8 +835,8 @@
     "itemId": "MLB605239077",
     "title": "Lavadora Lava Jato Portátil Pressão 2 Baterias + Maleta Preto 127/220v 50 Hz X 60 Hz",
     "originalPrice": 229.9,
-    "currentPrice": 102.26,
-    "discountPercentage": 55,
+    "currentPrice": 96.88,
+    "discountPercentage": 57,
     "imageUrl": "https://http2.mlstatic.com/D_Q_NP_2X_710675-MLB89102120983_082025-AB--lavadora-lava-jato-portatil-pressao-2-baterias--maleta.webp",
     "originalUrl": "https://www.mercadolivre.com.br/lavadora-lava-jato-portatil-pressao-2-baterias--maleta/up/MLBU605239077",
     "salesCountText": "+100mil vendidos",
@@ -1081,11 +1081,7 @@
     "originalUrl": "https://www.mercadolivre.com.br/aspirador-de-po-e-agua-wap-gtw-10-1400w-de-potencia-com-bocal-de-sopro/p/MLB8923631",
     "salesCountText": "+100mil vendidos",
     "isFull": true,
-    "onPageCoupon": {
-      "label": "R$ 219 OFF no Anúncio",
-      "discountType": "FIXED",
-      "discountValue": 219
-    }
+    "onPageCoupon": null
   },
   {
     "itemId": "MLB4127824755",
@@ -1369,7 +1365,7 @@
   },
   {
     "itemId": "MLB4558536627",
-    "title": "Bicicleta Ergométrica Spinning Bike Ergométrica It&#x27;s X11 Bicicleta Ergométrica Preto/vermelho",
+    "title": "Bicicleta Ergométrica Spinning Bike Ergométrica It's X11 Bicicleta Ergométrica Preto/vermelho",
     "originalPrice": 1399,
     "currentPrice": 439.9,
     "discountPercentage": 68,
@@ -1389,11 +1385,7 @@
     "originalUrl": "https://www.mercadolivre.com.br/aspirador-de-po-e-agua-wap-gtw-10-compacto-1400w-10-litros-amarelo/p/MLB8923630",
     "salesCountText": "+100mil vendidos",
     "isFull": true,
-    "onPageCoupon": {
-      "label": "R$ 214 OFF no Anúncio",
-      "discountType": "FIXED",
-      "discountValue": 214
-    }
+    "onPageCoupon": null
   },
   {
     "itemId": "MLB19506691",
@@ -1425,7 +1417,7 @@
   },
   {
     "itemId": "MLB75681377",
-    "title": "Smart TV PRO LG 55&#x27;&#x27; 4K Ultra HD AI 55UN85C",
+    "title": "Smart TV PRO LG 55'' 4K Ultra HD AI 55UN85C",
     "originalPrice": 4999,
     "currentPrice": 2540,
     "discountPercentage": 49,
@@ -1485,7 +1477,7 @@
   },
   {
     "itemId": "MLB2939238991",
-    "title": "Monitor Portátil 15.6&#x27;&#x27; Tela Externa Hdr Ips 1080p Ultrafino Preto 127/220v",
+    "title": "Monitor Portátil 15.6'' Tela Externa Hdr Ips 1080p Ultrafino Preto 127/220v",
     "originalPrice": 650,
     "currentPrice": 398.94,
     "discountPercentage": 38,
@@ -1653,7 +1645,7 @@
   },
   {
     "itemId": "MLB47109375",
-    "title": "Smartphone Samsung Galaxy A36 5G 128GB 6GB RAM Câmera Tripla de até 50MP Selfie de 12MP IP67 Super AMOLED 6.7&#x27;&#x27; NFC Recursos AI Android e Segurança Snapdragon - Branco",
+    "title": "Smartphone Samsung Galaxy A36 5G 128GB 6GB RAM Câmera Tripla de até 50MP Selfie de 12MP IP67 Super AMOLED 6.7'' NFC Recursos AI Android e Segurança Snapdragon - Branco",
     "originalPrice": 2212,
     "currentPrice": 1389,
     "discountPercentage": 37,
@@ -1674,9 +1666,9 @@
     "salesCountText": "+10mil vendidos",
     "isFull": true,
     "onPageCoupon": {
-      "label": "R$ 361 OFF no Anúncio",
+      "label": "R$ 50 OFF no Anúncio",
       "discountType": "FIXED",
-      "discountValue": 361
+      "discountValue": 50
     }
   },
   {
@@ -1930,9 +1922,9 @@
     "salesCountText": "+1mil vendidos",
     "isFull": false,
     "onPageCoupon": {
-      "label": "R$ 540 OFF no Anúncio",
+      "label": "R$ 46 OFF no Anúncio",
       "discountType": "FIXED",
-      "discountValue": 540
+      "discountValue": 46
     }
   },
   {
@@ -1977,7 +1969,7 @@
   },
   {
     "itemId": "MLB3929142061",
-    "title": "Chave De Impacto 1/2&#x27;&#x27; 700nm Brushless 2 Baterias Maleta Verde 127/220v",
+    "title": "Chave De Impacto 1/2'' 700nm Brushless 2 Baterias Maleta Verde 127/220v",
     "originalPrice": 655,
     "currentPrice": 278.97,
     "discountPercentage": 57,

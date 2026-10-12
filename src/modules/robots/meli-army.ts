@@ -390,11 +390,12 @@ export class MeliRobotArmyService {
             } | null = null;
 
             if (card.includes("poly-coupons__pill")) {
-              const couponBlock = card.split("poly-coupons__pill")[1]?.slice(0, 600) || "";
-              const ariaMoney = couponBlock.match(/aria-label=["'](\d+)\s*reais/i);
-              const pctText = couponBlock.match(/(\d+)\s*%\s*OFF\s*com\s*Cupom/i);
-              const fracMoney = couponBlock.match(
-                /andes-money-amount__fraction[^>]*>(\d+)<\/span>/i
+              const couponBlock = card.split("poly-coupons__pill")[1]?.slice(0, 650) || "";
+              const cleanText = couponBlock.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+              const hasOffWord = /OFF\s+com\s+Cupom/i.test(cleanText);
+              const pctText = cleanText.match(/(\d+)\s*%\s*OFF\s*com\s*Cupom/i);
+              const ariaMoney = couponBlock.match(
+                /aria-label=["'](\d+)\s*reais(?:\s*com\s*(\d+)\s*centavos)?["']/i
               );
 
               if (pctText) {
@@ -404,13 +405,27 @@ export class MeliRobotArmyService {
                   discountType: "PERCENT",
                   discountValue: val,
                 };
-              } else if (ariaMoney || fracMoney) {
-                const val = parseInt((ariaMoney ? ariaMoney[1] : fracMoney![1]), 10);
-                onPageCoupon = {
-                  label: `R$ ${val} OFF no Anúncio`,
-                  discountType: "FIXED",
-                  discountValue: val,
-                };
+              } else if (ariaMoney) {
+                const val = Number(
+                  (
+                    parseInt(ariaMoney[1], 10) +
+                    (ariaMoney[2] ? parseInt(ariaMoney[2], 10) : 0) / 100
+                  ).toFixed(2)
+                );
+                if (hasOffWord) {
+                  onPageCoupon = {
+                    label: `R$ ${Math.round(val)} OFF no Anúncio`,
+                    discountType: "FIXED",
+                    discountValue: Math.round(val),
+                  };
+                } else if (val < currentPrice && currentPrice - val >= 2) {
+                  const diff = Math.round(currentPrice - val);
+                  onPageCoupon = {
+                    label: `R$ ${diff} OFF no Anúncio`,
+                    discountType: "FIXED",
+                    discountValue: diff,
+                  };
+                }
               }
             }
 
