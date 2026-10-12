@@ -24,8 +24,11 @@ export const metadata: Metadata = {
     title: "Achados da Nanda",
   },
   icons: {
-    icon: "/icon",
-    apple: "/icon",
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
   },
 };
 

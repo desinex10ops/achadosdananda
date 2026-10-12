@@ -18,9 +18,11 @@ import {
   Clock,
   ChevronDown,
   X,
+  Share2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
+import { MobileBottomNav } from "@/components/ui/MobileBottomNav";
 
 export default function AchadosVitrinePage() {
   const [offers, setOffers] = useState<any[]>([]);
@@ -67,6 +69,27 @@ export default function AchadosVitrinePage() {
     navigator.clipboard.writeText(code);
     setCopiedCoupon(code);
     setTimeout(() => setCopiedCoupon(null), 2000);
+  };
+
+  const handleShareOffer = async (item: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const priceFormatted = `R$ ${Number(item.currentPrice).toFixed(2).replace(".", ",")}`;
+    const shareText = `🔥 *${item.title}*\n💰 Por apenas *${priceFormatted}*${
+      item.couponCode ? `\n🎟️ Cupom: *${item.couponCode}*` : ""
+    }\n\n👇 Confira na loja oficial:`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: item.title,
+          text: shareText,
+          url: item.affiliateUrl,
+        });
+      } catch (err) {}
+    } else {
+      navigator.clipboard.writeText(`${shareText} ${item.affiliateUrl}`);
+    }
   };
 
   return (
@@ -282,16 +305,26 @@ export default function AchadosVitrinePage() {
                       </div>
                     </div>
 
-                    {/* Botão de Compra com link rastreável */}
-                    <a
-                      href={item.affiliateUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition shadow-sm"
-                    >
-                      <span>Pegar Oferta</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
+                    {/* Botão de Compra + Compartilhar */}
+                    <div className="flex items-center gap-1.5">
+                      <a
+                        href={item.affiliateUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition shadow-sm"
+                      >
+                        <span>Pegar Oferta</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={(e) => handleShareOffer(item, e)}
+                        title="Compartilhar oferta no WhatsApp"
+                        className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 active:scale-95 transition shrink-0"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -299,31 +332,34 @@ export default function AchadosVitrinePage() {
           )}
         </div>
 
-        {/* Barra Fixa no Rodapé com Atalho para o Grupo VIP */}
-        <div className="fixed bottom-3 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-40">
+        {/* Card de Chamada para o Grupo VIP no Final da Lista */}
+        <div className="mt-8">
           <Link
             href="/vip"
-            className="w-full bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3 shadow-2xl flex items-center justify-between gap-3 text-white hover:border-emerald-500/50 transition group"
+            className="w-full bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-xl flex items-center justify-between gap-3 text-white hover:border-emerald-500/60 transition group"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
                 <Flame className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors">
-                  Receba bugs no WhatsApp
+                <p className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">
+                  Receba bugs de preço no WhatsApp
                 </p>
-                <p className="text-[10px] text-slate-400">Alertas em tempo real antes de esgotar</p>
+                <p className="text-[11px] text-slate-400">
+                  Alertas em tempo real antes do estoque acabar
+                </p>
               </div>
             </div>
-            <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 whitespace-nowrap">
+            <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-3 py-2 rounded-xl border border-emerald-500/20 whitespace-nowrap">
               Entrar Grátis →
             </span>
           </Link>
         </div>
 
-        {/* PWA Prompt */}
+        {/* PWA Prompt & Barra de Navegação Inferior Mobile */}
         <PwaInstallPrompt />
+        <MobileBottomNav />
 
       </div>
     </div>

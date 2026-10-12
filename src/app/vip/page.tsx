@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Flame,
   CheckCircle2,
@@ -18,7 +19,9 @@ import {
   Clock,
   Heart,
   MessageCircle,
+  ShoppingBag,
 } from "lucide-react";
+import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
 
 export default function MobileCapturePage() {
   const [offers, setOffers] = useState<any[]>([]);
@@ -391,12 +394,30 @@ export default function MobileCapturePage() {
           </div>
         </div>
 
-        {/* Rodapé Institucional */}
-        <div className="px-5 py-4 text-center border-t border-slate-800/60 text-[11px] text-slate-500">
-          <p className="font-medium text-slate-400 mb-1">Achados da Nanda Oficial © 2026</p>
-          <p className="text-[10px]">
-            Participamos de programas de afiliados para trazer as melhores ofertas verificadas.
-          </p>
+        {/* Rodapé Institucional + Links Rápidos do App */}
+        <div className="px-5 py-4 text-center border-t border-slate-800/60 text-[11px] text-slate-500 space-y-3">
+          <div className="flex items-center justify-center gap-3">
+            <Link
+              href="/achados"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 text-xs font-semibold transition"
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-rose-400" />
+              <span>Ver Vitrine</span>
+            </Link>
+            <Link
+              href="/cupons-vip"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 text-xs font-semibold transition"
+            >
+              <Ticket className="w-3.5 h-3.5 text-amber-400" />
+              <span>Cupons VIP</span>
+            </Link>
+          </div>
+          <div>
+            <p className="font-medium text-slate-400 mb-1">Achados da Nanda Oficial © 2026</p>
+            <p className="text-[10px]">
+              Participamos de programas de afiliados para trazer as melhores ofertas verificadas.
+            </p>
+          </div>
         </div>
 
         {/* Barra Fixa no Rodapé do Celular (Sticky Footer CTA) */}
@@ -412,6 +433,9 @@ export default function MobileCapturePage() {
             </span>
           </button>
         </div>
+
+        {/* PWA Prompt */}
+        <PwaInstallPrompt />
 
       </div>
     </div>

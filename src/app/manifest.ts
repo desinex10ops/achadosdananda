@@ -2,24 +2,69 @@ import { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/achados",
     name: "Achados da Nanda - Melhores Ofertas e Cupons",
     short_name: "Achados da Nanda",
     description: "Encontre promoções imperdíveis, cupons VIP e descontos exclusivos nas maiores lojas online.",
     start_url: "/achados",
+    scope: "/",
     display: "standalone",
     background_color: "#020617",
     theme_color: "#0f172a",
     orientation: "portrait",
+    categories: ["shopping", "lifestyle"],
     icons: [
       {
         src: "/icon-192.png",
         sizes: "192x192",
         type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "maskable",
       },
       {
         src: "/icon-512.png",
         sizes: "512x512",
         type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
+      {
+        src: "/icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
+      },
+    ],
+    shortcuts: [
+      {
+        name: "Vitrine de Ofertas",
+        short_name: "Ofertas",
+        description: "Ver os achadinhos e promoções do dia",
+        url: "/achados",
+        icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+      },
+      {
+        name: "Cupons VIP do Dia",
+        short_name: "Cupons VIP",
+        description: "Copiar cupons exclusivos das lojas",
+        url: "/cupons-vip",
+        icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+      },
+      {
+        name: "Grupo VIP no WhatsApp",
+        short_name: "Grupo VIP",
+        description: "Entrar gratuitamente no grupo de alertas",
+        url: "/vip",
+        icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }],
       },
     ],
   };

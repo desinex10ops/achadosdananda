@@ -16,6 +16,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { PwaInstallPrompt } from "@/components/ui/PwaInstallPrompt";
+import { MobileBottomNav } from "@/components/ui/MobileBottomNav";
 
 interface Coupon {
   id: string;
@@ -274,13 +275,11 @@ export default function CuponsVipPage() {
             <span>Todos os cupons são verificados e aplicados diretamente nos apps oficiais.</span>
           </div>
         </div>
-      </main>
 
-      {/* Floating Sticky Mobile VIP Group Bar */}
-      <aside className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 p-3 shadow-2xl">
-        <div className="max-w-md mx-auto flex items-center justify-between gap-3">
+        {/* Inline VIP Callout Card */}
+        <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 border border-emerald-500/30 p-4 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-bold text-white truncate">Quer cupons secretos antes?</p>
+            <p className="text-xs sm:text-sm font-bold text-white truncate">Quer cupons secretos antes?</p>
             <p className="text-[11px] text-emerald-400">Entre no nosso WhatsApp VIP grátis</p>
           </div>
           <Link
@@ -291,10 +290,11 @@ export default function CuponsVipPage() {
             <span>Entrar Agora</span>
           </Link>
         </div>
-      </aside>
+      </main>
 
-      {/* PWA Prompt */}
+      {/* PWA Prompt & Mobile Bottom Navigation */}
       <PwaInstallPrompt />
+      <MobileBottomNav />
     </div>
   );
 }
