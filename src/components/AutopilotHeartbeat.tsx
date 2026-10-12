@@ -41,23 +41,11 @@ export function AutopilotHeartbeat() {
       }
     };
 
-    // Executa imediatamente na inicialização
-    pulse();
-
-    // Pulsa a cada 15 segundos para pegar qualquer oferta no minuto exato agendado
-    const interval = setInterval(pulse, 15000);
-
-    // Quando o usuário volta para a aba, verifica imediatamente
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        pulse();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    // Pulsa a cada 60 segundos de forma leve (sem forçar reconexão ao trocar de aba)
+    const interval = setInterval(pulse, 60000);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 

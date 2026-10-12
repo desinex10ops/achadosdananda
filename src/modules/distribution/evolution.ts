@@ -96,6 +96,7 @@ export class EvolutionClient {
 
   /**
    * Cria uma nova instância de WhatsApp para um nicho específico
+   * (Com groupsIgnore: true e syncFullHistory: false para não sobrecarregar o celular com avisos de sincronização)
    */
   async createInstance(instanceName: string) {
     const url = `${this.baseUrl}/instance/create`;
@@ -106,6 +107,10 @@ export class EvolutionClient {
         instanceName,
         qrcode: true,
         integration: "WHATSAPP-BAILEYS",
+        groupsIgnore: true,
+        syncFullHistory: false,
+        readMessages: false,
+        readStatus: false,
       }),
     });
 
