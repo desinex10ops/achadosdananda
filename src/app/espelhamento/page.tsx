@@ -61,6 +61,7 @@ interface CapturedOffer {
   remoteJid: string;
   timestamp: number;
   hasImage: boolean;
+  productImageUrl?: string | null;
   title: string;
   originalText: string;
   clonedText: string;
@@ -68,7 +69,8 @@ interface CapturedOffer {
     originalUrl: string;
     resolvedUrl?: string;
     affiliateUrl: string;
-    store: string;
+    store?: string;
+    platform?: string;
   }[];
 }
 
@@ -251,6 +253,7 @@ export default function EspelhamentoPage() {
           messageId: offer.messageId,
           clonedText: finalClonedText,
           hasImage: offer.hasImage,
+          productImageUrl: offer.productImageUrl || null,
           sendWithImage,
         }),
       });
@@ -259,7 +262,7 @@ export default function EspelhamentoPage() {
         showToast(
           `✅ Oferta enviada para "${
             tgtGroup?.name || "Grupo Destino"
-          }" com seu link de afiliada!`
+          }" com foto e seu link curto!`
         );
       } else {
         showToast(`❌ Erro ao enviar: ${json.error || "Falha no disparo"}`);
@@ -282,6 +285,7 @@ export default function EspelhamentoPage() {
       messageId: o.messageId,
       clonedText: editedTexts[o.messageId] || o.clonedText,
       hasImage: o.hasImage,
+      productImageUrl: o.productImageUrl || null,
     }));
 
     setSendingBatch(true);
@@ -785,12 +789,23 @@ export default function EspelhamentoPage() {
                         </span>
                       </div>
 
+                      {/* Foto do Produto Extraída Automaticamente */}
+                      {offer.productImageUrl && (
+                        <div className="mb-2.5 bg-white rounded-lg p-1.5 flex items-center justify-center h-32 overflow-hidden">
+                          <img
+                            src={offer.productImageUrl}
+                            alt={offer.title}
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        </div>
+                      )}
+
                       {/* Texto já com o Link de Afiliado da Nanda (Editável se quiser) */}
                       <label className="block text-[10px] text-zinc-400 mb-1 font-medium">
-                        Mensagem pronta (você pode editar antes de enviar):
+                        Mensagem pronta (com link curto e sua tag):
                       </label>
                       <textarea
-                        rows={6}
+                        rows={5}
                         value={currentText}
                         onChange={(e) =>
                           setEditedTexts((prev) => ({
@@ -814,7 +829,7 @@ export default function EspelhamentoPage() {
                                   De: <s>{lnk.originalUrl}</s>
                                 </span>
                                 <span className="text-orange-400 font-bold">
-                                  {lnk.store}
+                                  {lnk.store || lnk.platform}
                                 </span>
                               </div>
                               <a

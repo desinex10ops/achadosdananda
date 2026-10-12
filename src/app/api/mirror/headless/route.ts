@@ -56,7 +56,7 @@ async function resolveTargetJid(targetGroupId?: string | null): Promise<string |
   return null;
 }
 
-// Função auxiliar para disparar 1 oferta clonada (com ou sem a foto original do grupo fonte)
+// Função auxiliar para disparar 1 oferta clonada (com foto original do grupo OU foto extraída do produto!)
 async function dispatchSingleClonedOffer(params: {
   instanceName: string;
   targetJid: string;
@@ -64,14 +64,22 @@ async function dispatchSingleClonedOffer(params: {
   messageId?: string;
   clonedText: string;
   hasImage?: boolean;
+  productImageUrl?: string | null;
 }): Promise<{ success: boolean; method: string; error?: string }> {
-  const { instanceName, targetJid, sendWithImage, messageId, clonedText, hasImage } =
-    params;
+  const {
+    instanceName,
+    targetJid,
+    sendWithImage,
+    messageId,
+    clonedText,
+    hasImage,
+    productImageUrl,
+  } = params;
 
-  let base64Image: string | null = null;
+  let mediaPayload: string | null = null;
   let mimeType = "image/jpeg";
 
-  // Se a oferta original tinha foto no grupo concorrente e o usuário quer enviar com foto, baixamos via Headless API
+  // 1. Se a oferta original tinha foto anexada no WhatsApp, tenta baixar o base64 original
   if (sendWithImage && hasImage && messageId) {
     try {
       const mediaResp = await fetch(
@@ -98,20 +106,26 @@ async function dispatchSingleClonedOffer(params: {
       if (mediaResp.ok) {
         const mediaJson = await mediaResp.json();
         if (mediaJson?.base64) {
-          base64Image = mediaJson.base64;
+          mediaPayload = mediaJson.base64;
           mimeType = mediaJson.mimetype || "image/jpeg";
         }
       }
     } catch (mediaErr) {
       console.warn(
-        "[HeadlessMirror] Falha ao extrair base64 da mídia original, enviando texto:",
+        "[HeadlessMirror] Falha ao extrair base64 da mídia original:",
         mediaErr
       );
     }
   }
 
-  // Se conseguimos a imagem original da oferta, enviamos com imagem + caption clonada
-  if (base64Image) {
+  // 2. Se a mensagem original era apenas texto (sem foto anexada), usa a foto oficial do produto extraída do link!
+  if (sendWithImage && !mediaPayload && productImageUrl) {
+    mediaPayload = productImageUrl;
+    mimeType = "image/jpeg";
+  }
+
+  // 3. Dispara com foto + legenda (caption)
+  if (mediaPayload) {
     const sendMediaResp = await fetch(
       `${EVOLUTION_BASE_URL}/message/sendMedia/${encodeURIComponent(
         instanceName
@@ -127,7 +141,7 @@ async function dispatchSingleClonedOffer(params: {
           mediatype: "image",
           mimetype: mimeType,
           caption: clonedText,
-          media: base64Image,
+          media: mediaPayload,
         }),
       }
     );
@@ -277,13 +291,12 @@ export async function GET(request: Request) {
       .filter(({ text }) => /https?:\/\/[^\s]+/i.test(text))
       .slice(0, limit);
 
-    // 4. Desencurta e converte todos os links para os links de afiliada da Nanda em paralelo
+    // 4. Desencurta, extrai foto do produto, converte p/ afiliado da Nanda e encurta o link em paralelo
     const clonedOffers = await Promise.all(
       offerRecords.map(async ({ rec, text }) => {
-        const { clonedText, replacedLinks } =
+        const { clonedText, replacedLinks, productImageUrl } =
           await MirrorEngine.cloneMessageAsync(text);
 
-        // Extrai título amigável da oferta
         const lines = clonedText
           .split(/\r?\n/)
           .map((l) => l.replace(/[*_~`]/g, "").trim())
@@ -294,7 +307,8 @@ export async function GET(request: Request) {
           messageId: rec.key?.id || "",
           remoteJid: rec.key?.remoteJid || requestedSourceJid,
           timestamp: rec.messageTimestamp || Math.floor(Date.now() / 1000),
-          hasImage: Boolean(rec.message?.imageMessage),
+          hasImage: Boolean(rec.message?.imageMessage) || Boolean(productImageUrl),
+          productImageUrl: productImageUrl || null,
           title,
           originalText: text,
           clonedText,
@@ -338,6 +352,7 @@ export async function POST(request: Request) {
       messageId,
       clonedText,
       hasImage = true,
+      productImageUrl = null,
       sendWithImage = true,
       offers = [],
     } = body;
@@ -366,7 +381,6 @@ export async function POST(request: Request) {
           continue;
         }
 
-        // Busca as últimas 8 mensagens do grupo de origem
         const msgResp = await fetch(
           `${EVOLUTION_BASE_URL}/chat/findMessages/${encodeURIComponent(
             instanceName
@@ -391,13 +405,11 @@ export async function POST(request: Request) {
 
         const ruleCreatedMs = new Date(rule.createdAt).getTime();
         const ruleUpdatedMs = new Date(rule.updatedAt).getTime();
-        // Se updatedAt === createdAt (regra recém-criada), aceita ofertas dos últimos 5 minutos
         const lastCheckpointSec =
           Math.abs(ruleUpdatedMs - ruleCreatedMs) < 1500
             ? Math.floor((ruleCreatedMs - 5 * 60 * 1000) / 1000)
             : Math.floor(ruleUpdatedMs / 1000);
 
-        // Ordena do mais antigo para o mais novo entre os novos
         const newOfferRecords = records
           .filter((rec) => {
             const ts = Number(rec.messageTimestamp || 0);
@@ -416,8 +428,11 @@ export async function POST(request: Request) {
           if (ts > maxTimestampProcessed) maxTimestampProcessed = ts;
 
           const text = extractMessageText(rec);
-          const { clonedText: convertedText, replacedLinks } =
-            await MirrorEngine.cloneMessageAsync(text);
+          const {
+            clonedText: convertedText,
+            replacedLinks,
+            productImageUrl: extractedImg,
+          } = await MirrorEngine.cloneMessageAsync(text);
 
           if (replacedLinks.length === 0 && rule.filterOfficialOnly) {
             continue;
@@ -430,6 +445,7 @@ export async function POST(request: Request) {
             messageId: rec.key?.id,
             clonedText: convertedText,
             hasImage: Boolean(rec.message?.imageMessage),
+            productImageUrl: extractedImg,
           });
 
           if (sendRes.success) {
@@ -439,11 +455,11 @@ export async function POST(request: Request) {
               sourceGroupName: rule.sourceGroupName,
               targetGroupName: rule.targetGroupName,
               messageId: rec.key?.id,
+              method: sendRes.method,
             });
           }
         }
 
-        // Atualiza o checkpoint no banco para nunca enviar a mesma oferta 2 vezes
         if (maxTimestampProcessed > lastCheckpointSec) {
           await (prisma as any).groupMirrorRule.update({
             where: { id: rule.id },
@@ -499,6 +515,13 @@ export async function POST(request: Request) {
         );
       }
 
+      // Se não veio productImageUrl no body, tenta extrair do texto original/clonado
+      let finalProductImg = productImageUrl;
+      if (!finalProductImg && sendWithImage) {
+        const resClone = await MirrorEngine.cloneMessageAsync(clonedText);
+        finalProductImg = resClone.productImageUrl;
+      }
+
       const result = await dispatchSingleClonedOffer({
         instanceName,
         targetJid: resolvedTarget,
@@ -506,6 +529,7 @@ export async function POST(request: Request) {
         messageId,
         clonedText,
         hasImage,
+        productImageUrl: finalProductImg,
       });
 
       if (result.success) {
@@ -515,7 +539,7 @@ export async function POST(request: Request) {
               title: "🕵️‍♀️ Oferta Espelhada Enviada!",
               message: `Oferta capturada de "${
                 sourceGroupName || sourceJid || "Grupo Fonte"
-              }" enviada com seu link de afiliada para "${
+              }" enviada com foto e link curto de afiliada para "${
                 targetGroupName || resolvedTarget
               }".`,
               type: "SUCCESS",
@@ -557,6 +581,7 @@ export async function POST(request: Request) {
           messageId: item.messageId,
           clonedText: item.clonedText,
           hasImage: item.hasImage,
+          productImageUrl: item.productImageUrl,
         });
         if (res.success) sentCount++;
         results.push({ messageId: item.messageId, ...res });

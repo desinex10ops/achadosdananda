@@ -1,11 +1,85 @@
 export interface MirroredLinkResult {
   originalUrl: string;
   resolvedUrl?: string;
+  fullAffiliateUrl?: string;
   affiliateUrl: string;
+  productImageUrl?: string | null;
   platform: "MERCADO_LIVRE" | "SHOPEE" | "AMAZON" | "MAGALU" | "OUTRO";
 }
 
+// Cache em memória para evitar chamadas repetidas ao encurtador e desencurtador
+const resolvedCache = new Map<string, MirroredLinkResult>();
+const shortUrlCache = new Map<string, string>();
+
 export class MirrorEngine {
+  /**
+   * Encurta uma URL longa de afiliado usando TinyURL para ficar limpa e curta no WhatsApp
+   */
+  static async shortenUrl(longUrl: string): Promise<string> {
+    if (!longUrl || longUrl.length < 42) return longUrl;
+    const cached = shortUrlCache.get(longUrl);
+    if (cached) return cached;
+
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 2800);
+      const res = await fetch(
+        `https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`,
+        { signal: ctrl.signal }
+      );
+      clearTimeout(timer);
+      if (res.ok) {
+        const short = (await res.text()).trim();
+        if (short.startsWith("https://tinyurl.com/")) {
+          shortUrlCache.set(longUrl, short);
+          return short;
+        }
+      }
+    } catch {}
+
+    return longUrl;
+  }
+
+  /**
+   * Extrai a URL da imagem principal do produto a partir do HTML da página (Mercado Livre, Shopee, Amazon)
+   */
+  static extractProductImageFromHtml(html: string): string | null {
+    if (!html) return null;
+
+    // 1. Tenta og:image
+    const ogMatch =
+      html.match(
+        /property=["']og:image["'][^>]*content=["']([^"']+)["']/i
+      ) ||
+      html.match(
+        /content=["']([^"']+)["'][^>]*property=["']og:image["']/i
+      );
+
+    let imgUrl = ogMatch?.[1] || null;
+
+    // 2. Fallback para imagem de alta resolução do Mercado Livre (-O.webp / -O.jpg)
+    if (!imgUrl || imgUrl.includes("logo") || imgUrl.includes("avatar")) {
+      const mlImgMatch = html.match(
+        /https:\/\/http2\.mlstatic\.com\/D_NQ_NP_[^"'<>\s)]+-O\.(?:webp|jpg|png)/i
+      );
+      if (mlImgMatch?.[0]) {
+        imgUrl = mlImgMatch[0];
+      }
+    }
+
+    if (!imgUrl) return null;
+
+    // Converte .webp do Mercado Livre para .jpg para máxima compatibilidade no envio de mídia do WhatsApp
+    if (
+      imgUrl.includes("mlstatic.com") &&
+      imgUrl.toLowerCase().endsWith(".webp")
+    ) {
+      imgUrl = imgUrl.replace(/\.webp$/i, ".jpg");
+    }
+
+    return imgUrl;
+  }
+
   /**
    * Detecta plataforma e converte URL direta para o link de afiliada oficial da Nanda
    */
@@ -20,7 +94,6 @@ export class MirrorEngine {
       low.includes("meli.la")
     ) {
       const tag = process.env.MERCADO_LIVRE_AFFILIATE_TAG || "clma9212398";
-      // Limpa parâmetros de afiliados concorrentes
       const base = clean.split("#")[0];
       try {
         const parsed = new URL(base);
@@ -34,14 +107,17 @@ export class MirrorEngine {
         parsed.searchParams.set("matt_word", tag);
         return {
           originalUrl: url,
+          fullAffiliateUrl: parsed.toString(),
           affiliateUrl: parsed.toString(),
           platform: "MERCADO_LIVRE",
         };
       } catch {
         const noQuery = base.split("?")[0];
+        const full = `${noQuery}?matt_tool=${tag}&matt_word=${tag}`;
         return {
           originalUrl: url,
-          affiliateUrl: `${noQuery}?matt_tool=${tag}&matt_word=${tag}`,
+          fullAffiliateUrl: full,
+          affiliateUrl: full,
           platform: "MERCADO_LIVRE",
         };
       }
@@ -55,20 +131,28 @@ export class MirrorEngine {
     ) {
       const tag = process.env.SHOPEE_AFFILIATE_TAG || "achadosdananda-20";
       const noQuery = clean.split("?")[0].split("#")[0];
+      const full = `${noQuery}?utm_source=${tag}&aff_sub=${tag}`;
       return {
         originalUrl: url,
-        affiliateUrl: `${noQuery}?utm_source=${tag}&aff_sub=${tag}`,
+        fullAffiliateUrl: full,
+        affiliateUrl: full,
         platform: "SHOPEE",
       };
     }
 
     // 3. Amazon
-    if (low.includes("amazon.com") || low.includes("amzn.to") || low.includes("a.co")) {
+    if (
+      low.includes("amazon.com") ||
+      low.includes("amzn.to") ||
+      low.includes("a.co")
+    ) {
       const tag = process.env.AMAZON_ASSOCIATE_TAG || "achadosnanda-20";
       const noQuery = clean.split("?")[0].split("#")[0];
+      const full = `${noQuery}?tag=${tag}`;
       return {
         originalUrl: url,
-        affiliateUrl: `${noQuery}?tag=${tag}`,
+        fullAffiliateUrl: full,
+        affiliateUrl: full,
         platform: "AMAZON",
       };
     }
@@ -87,18 +171,31 @@ export class MirrorEngine {
           `magazinevoce.com.br/${tag}`
         );
       }
-      return { originalUrl: url, affiliateUrl: updated, platform: "MAGALU" };
+      return {
+        originalUrl: url,
+        fullAffiliateUrl: updated,
+        affiliateUrl: updated,
+        platform: "MAGALU",
+      };
     }
 
-    return { originalUrl: url, affiliateUrl: clean, platform: "OUTRO" };
+    return {
+      originalUrl: url,
+      fullAffiliateUrl: clean,
+      affiliateUrl: clean,
+      platform: "OUTRO",
+    };
   }
 
   /**
-   * Desencurta links de concorrentes (meli.la, dailydoachadin, s.shopee.com.br, shope.ee, amzn.to)
-   * extraindo a URL limpa do produto real e aplicando a tag de afiliada oficial da Nanda!
+   * Desencurta links de concorrentes (meli.la, dailydoachadin, s.shopee.com.br, shope.ee, amzn.to),
+   * extrai a foto oficial do produto (og:image), aplica a tag de afiliada da Nanda e encurta o link final!
    */
   static async resolveAndConvertUrl(rawUrl: string): Promise<MirroredLinkResult> {
     const cleanRaw = rawUrl.trim();
+    const cached = resolvedCache.get(cleanRaw);
+    if (cached) return cached;
+
     const mlTag = process.env.MERCADO_LIVRE_AFFILIATE_TAG || "clma9212398";
     const shopeeTag = process.env.SHOPEE_AFFILIATE_TAG || "achadosdananda-20";
     const amazonTag = process.env.AMAZON_ASSOCIATE_TAG || "achadosnanda-20";
@@ -109,9 +206,9 @@ export class MirrorEngine {
       const res = await fetch(cleanRaw, {
         redirect: "follow",
         headers: {
-          "User-Agent":
-            "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "User-Agent": "WhatsApp/2.24.12.78 A",
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
         signal: controller.signal,
       });
@@ -119,8 +216,9 @@ export class MirrorEngine {
 
       let finalUrl = res.url || cleanRaw;
       const html = await res.text().catch(() => "");
+      let productImageUrl = this.extractProductImageFromHtml(html);
 
-      // Caso 1: Redirecionador intermediário caiu num link curto da Shopee (ex: dailydoachadin -> s.shopee.com.br)
+      // Caso 1: Redirecionador intermediário caiu num link curto da Shopee
       if (
         finalUrl.includes("s.shopee.com.br") ||
         finalUrl.includes("shope.ee")
@@ -130,12 +228,16 @@ export class MirrorEngine {
           const t2 = setTimeout(() => c2.abort(), 4500);
           const r2 = await fetch(finalUrl, {
             redirect: "follow",
-            headers: { "User-Agent": "Mozilla/5.0" },
+            headers: { "User-Agent": "WhatsApp/2.24.12.78 A" },
             signal: c2.signal,
           });
           clearTimeout(t2);
           if (r2.url && r2.url.includes("shopee.com.br")) {
             finalUrl = r2.url;
+          }
+          if (!productImageUrl) {
+            const html2 = await r2.text().catch(() => "");
+            productImageUrl = this.extractProductImageFromHtml(html2);
           }
         } catch {}
       }
@@ -147,10 +249,14 @@ export class MirrorEngine {
         html.includes("mercadolivre.com.br")
       ) {
         const allMlLinks =
-          html.match(/https?:\/\/[^"'<>\s]*mercadolivre\.com\.br\/[^"'<>\s]+/gi) || [];
+          html.match(
+            /https?:\/\/[^"'<>\s]*mercadolivre\.com\.br\/[^"'<>\s]+/gi
+          ) || [];
         const productLink = allMlLinks.find(
           (u) =>
-            (u.includes("/p/MLB") || u.includes("MLB-") || u.includes("/up/MLBU")) &&
+            (u.includes("/p/MLB") ||
+              u.includes("MLB-") ||
+              u.includes("/up/MLBU")) &&
             !u.includes("noindex") &&
             !u.includes("security.js")
         );
@@ -160,53 +266,89 @@ export class MirrorEngine {
             .replace(/&amp;/g, "&")
             .split("?")[0]
             .split("#")[0];
-          return {
+          const fullAffiliateUrl = `${cleanProductUrl}?matt_tool=${mlTag}&matt_word=${mlTag}`;
+          const shortAffiliateUrl = await this.shortenUrl(fullAffiliateUrl);
+          const result: MirroredLinkResult = {
             originalUrl: rawUrl,
             resolvedUrl: cleanProductUrl,
-            affiliateUrl: `${cleanProductUrl}?matt_tool=${mlTag}&matt_word=${mlTag}`,
+            fullAffiliateUrl,
+            affiliateUrl: shortAffiliateUrl,
+            productImageUrl,
             platform: "MERCADO_LIVRE",
           };
+          resolvedCache.set(cleanRaw, result);
+          return result;
         }
 
-        // Se a própria finalUrl já for de produto do ML
         if (finalUrl.includes("/p/MLB") || finalUrl.includes("MLB-")) {
           const cleanProductUrl = finalUrl.split("?")[0].split("#")[0];
-          return {
+          const fullAffiliateUrl = `${cleanProductUrl}?matt_tool=${mlTag}&matt_word=${mlTag}`;
+          const shortAffiliateUrl = await this.shortenUrl(fullAffiliateUrl);
+          const result: MirroredLinkResult = {
             originalUrl: rawUrl,
             resolvedUrl: cleanProductUrl,
-            affiliateUrl: `${cleanProductUrl}?matt_tool=${mlTag}&matt_word=${mlTag}`,
+            fullAffiliateUrl,
+            affiliateUrl: shortAffiliateUrl,
+            productImageUrl,
             platform: "MERCADO_LIVRE",
           };
+          resolvedCache.set(cleanRaw, result);
+          return result;
         }
 
-        // Se for social link do ML e não extraiu o /p/MLB, substitui matt_tool e matt_word na URL
-        return this.convertUrl(finalUrl);
+        const converted = this.convertUrl(finalUrl);
+        const shortAffiliateUrl = await this.shortenUrl(converted.affiliateUrl);
+        const result: MirroredLinkResult = {
+          ...converted,
+          originalUrl: rawUrl,
+          affiliateUrl: shortAffiliateUrl,
+          productImageUrl,
+        };
+        resolvedCache.set(cleanRaw, result);
+        return result;
       }
 
       // Caso 3: Shopee
       if (finalUrl.includes("shopee.com") || finalUrl.includes("shope.ee")) {
         const cleanShopee = finalUrl.split("?")[0].split("#")[0];
-        return {
+        const fullAffiliateUrl = `${cleanShopee}?utm_source=${shopeeTag}&aff_sub=${shopeeTag}`;
+        const shortAffiliateUrl = await this.shortenUrl(fullAffiliateUrl);
+        const result: MirroredLinkResult = {
           originalUrl: rawUrl,
           resolvedUrl: cleanShopee,
-          affiliateUrl: `${cleanShopee}?utm_source=${shopeeTag}&aff_sub=${shopeeTag}`,
+          fullAffiliateUrl,
+          affiliateUrl: shortAffiliateUrl,
+          productImageUrl,
           platform: "SHOPEE",
         };
+        resolvedCache.set(cleanRaw, result);
+        return result;
       }
 
       // Caso 4: Amazon
       if (finalUrl.includes("amazon.com") || finalUrl.includes("amzn.to")) {
         const cleanAmazon = finalUrl.split("?")[0].split("#")[0];
-        return {
+        const fullAffiliateUrl = `${cleanAmazon}?tag=${amazonTag}`;
+        const shortAffiliateUrl = await this.shortenUrl(fullAffiliateUrl);
+        const result: MirroredLinkResult = {
           originalUrl: rawUrl,
           resolvedUrl: cleanAmazon,
-          affiliateUrl: `${cleanAmazon}?tag=${amazonTag}`,
+          fullAffiliateUrl,
+          affiliateUrl: shortAffiliateUrl,
+          productImageUrl,
           platform: "AMAZON",
         };
+        resolvedCache.set(cleanRaw, result);
+        return result;
       }
     } catch {}
 
-    return this.convertUrl(cleanRaw);
+    const fallback = this.convertUrl(cleanRaw);
+    const shortFallback = await this.shortenUrl(fallback.affiliateUrl);
+    return {
+      ...fallback,
+      affiliateUrl: shortFallback,
+    };
   }
 
   /**
@@ -227,7 +369,7 @@ export class MirrorEngine {
   }
 
   /**
-   * Modo CLONE Síncrono (rápido)
+   * Modo CLONE Síncrono
    */
   static cloneMessage(text: string): {
     clonedText: string;
@@ -270,18 +412,21 @@ export class MirrorEngine {
 
   /**
    * Modo CLONE Assíncrono Completo:
-   * Desencurta links (meli.la, dailydoachadin, s.shopee.com.br, amzn.to) e troca APENAS o link pelo de afiliada da Nanda!
+   * Desencurta links, extrai a foto real do produto, aplica a tag de afiliada da Nanda e encurta o link final!
    */
   static async cloneMessageAsync(text: string): Promise<{
     clonedText: string;
     replacedLinks: MirroredLinkResult[];
+    productImageUrl: string | null;
   }> {
-    if (!text) return { clonedText: "", replacedLinks: [] };
+    if (!text)
+      return { clonedText: "", replacedLinks: [], productImageUrl: null };
 
     const urlRegex = /(https?:\/\/[^\s]+)/gi;
     const matches = Array.from(text.matchAll(urlRegex));
     const replacedLinks: MirroredLinkResult[] = [];
     let clonedText = text;
+    let firstProductImage: string | null = null;
 
     for (const m of matches) {
       const fullMatch = m[0];
@@ -305,6 +450,9 @@ export class MirrorEngine {
 
       const resolved = await this.resolveAndConvertUrl(rawUrl);
       replacedLinks.push(resolved);
+      if (!firstProductImage && resolved.productImageUrl) {
+        firstProductImage = resolved.productImageUrl;
+      }
       clonedText = clonedText.replace(
         fullMatch,
         resolved.affiliateUrl + trailingPunct
@@ -312,6 +460,10 @@ export class MirrorEngine {
     }
 
     clonedText = this.sanitizeCompetitorFooters(clonedText);
-    return { clonedText, replacedLinks };
+    return {
+      clonedText,
+      replacedLinks,
+      productImageUrl: firstProductImage,
+    };
   }
 }

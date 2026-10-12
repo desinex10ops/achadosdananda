@@ -67,7 +67,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, ignored: "duplicate_message_id" });
     }
 
-    // Busca regras ativas no banco
     const activeRules = await (prisma as any).groupMirrorRule.findMany({
       where: { isActive: true },
     });
@@ -76,7 +75,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, ignored: "no_active_rules" });
     }
 
-    // Filtra regras cujo sourceGroupId bate com o remoteJid
     const matchingRules = activeRules.filter((rule: any) => {
       if (rule.sourceGroupId && rule.sourceGroupId.trim() === remoteJid.trim()) {
         return true;
@@ -96,8 +94,8 @@ export async function POST(request: Request) {
       processedMessageIds.add(messageId);
     }
 
-    // Desencurta e substitui apenas os links para as tags de afiliada da Nanda
-    const { clonedText, replacedLinks } =
+    // Desencurta, extrai foto oficial do produto, aplica tag de afiliada da Nanda e encurta o link!
+    const { clonedText, replacedLinks, productImageUrl } =
       await MirrorEngine.cloneMessageAsync(originalText);
 
     if (replacedLinks.length === 0 && matchingRules[0]?.filterOfficialOnly) {
@@ -107,13 +105,13 @@ export async function POST(request: Request) {
       });
     }
 
-    // Verifica se a mensagem tem imagem para clonar junto
+    // 1. Verifica se a mensagem original tinha foto anexada no WhatsApp
     const hasImage = Boolean(msgData?.message?.imageMessage);
-    let base64Image: string | null = msgData?.message?.base64 || null;
+    let mediaPayload: string | null = msgData?.message?.base64 || null;
     let mimeType =
       msgData?.message?.imageMessage?.mimetype || "image/jpeg";
 
-    if (hasImage && !base64Image && messageId) {
+    if (hasImage && !mediaPayload && messageId) {
       try {
         const mediaResp = await fetch(
           `${EVOLUTION_BASE_URL}/chat/getBase64FromMediaMessage/${encodeURIComponent(
@@ -134,7 +132,7 @@ export async function POST(request: Request) {
         if (mediaResp.ok) {
           const mediaJson = await mediaResp.json();
           if (mediaJson?.base64) {
-            base64Image = mediaJson.base64;
+            mediaPayload = mediaJson.base64;
             mimeType = mediaJson.mimetype || mimeType;
           }
         }
@@ -143,10 +141,15 @@ export async function POST(request: Request) {
       }
     }
 
+    // 2. Se a mensagem original era apenas texto (ex: "Irmãs das Promos"), usa a foto oficial do produto extraída do link!
+    if (!mediaPayload && productImageUrl) {
+      mediaPayload = productImageUrl;
+      mimeType = "image/jpeg";
+    }
+
     const dispatchedTargets: string[] = [];
 
     for (const rule of matchingRules) {
-      // Verifica se essa mensagem já foi processada pelo poller AUTO_SYNC_RULES via updatedAt
       const ruleCreatedMs = new Date(rule.createdAt).getTime();
       const ruleUpdatedMs = new Date(rule.updatedAt).getTime();
       const lastCheckpointSec =
@@ -158,7 +161,6 @@ export async function POST(request: Request) {
         continue;
       }
 
-      // Atualiza imediatamente o updatedAt no banco como trava contra duplicidade
       await (prisma as any).groupMirrorRule.update({
         where: { id: rule.id },
         data: {
@@ -183,9 +185,9 @@ export async function POST(request: Request) {
       if (targetJid === remoteJid) continue;
 
       const shouldSendImage =
-        rule.mediaFormat !== "PREVIEW" && Boolean(base64Image);
+        rule.mediaFormat !== "PREVIEW" && Boolean(mediaPayload);
 
-      if (shouldSendImage && base64Image) {
+      if (shouldSendImage && mediaPayload) {
         const sendMediaResp = await fetch(
           `${EVOLUTION_BASE_URL}/message/sendMedia/${encodeURIComponent(
             instanceName
@@ -201,7 +203,7 @@ export async function POST(request: Request) {
               mediatype: "image",
               mimetype: mimeType,
               caption: clonedText,
-              media: base64Image,
+              media: mediaPayload,
             }),
           }
         );
@@ -238,8 +240,8 @@ export async function POST(request: Request) {
       try {
         await prisma.notification.create({
           data: {
-            title: "⚡ Oferta Espelhada Automaticamente!",
-            message: `Nova oferta de "${matchingRules[0].sourceGroupName}" foi convertida para seu link de afiliada e enviada para "${dispatchedTargets.join(", ")}".`,
+            title: "⚡ Oferta Espelhada com Foto + Link Curto!",
+            message: `Nova oferta de "${matchingRules[0].sourceGroupName}" convertida com foto do produto e link curto para "${dispatchedTargets.join(", ")}".`,
             type: "SUCCESS",
             link: "/espelhamento",
           },
@@ -251,6 +253,7 @@ export async function POST(request: Request) {
       success: true,
       messageId,
       replacedLinksCount: replacedLinks.length,
+      productImageUrl,
       dispatchedTargets,
     });
   } catch (err: any) {
