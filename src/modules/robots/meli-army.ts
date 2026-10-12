@@ -26,7 +26,11 @@ export interface MeliSmartCoupon {
   categoryName: string;
   onlyFull?: boolean;
   validUntil: string;
-  source: "ROBOT_RADAR" | "DATABASE";
+  /**
+   * ON_PAGE_CHECKBOX = Cupom oficial nativo da página do produto no Mercado Livre (basta marcar "Aplicar cupom" no anúncio, sem digitar código)
+   * DATABASE = Código alfanumérico cadastrado manualmente pela afiliada
+   */
+  source: "ON_PAGE_CHECKBOX" | "DATABASE";
 }
 
 export interface MatchedMeliDeal {
@@ -45,12 +49,15 @@ export interface MatchedMeliDeal {
   categoryName: string;
   robotId: string;
   robotName: string;
+  isLiveFromMeli?: boolean;
+  onPageCouponText?: string | null;
   applicableCoupons: Array<{
     code: string;
     discountLabel: string;
     couponSavings: number;
     finalPrice: number;
     totalDiscountPct: number;
+    isCheckboxCoupon?: boolean;
   }>;
   bestCoupon: {
     code: string;
@@ -58,6 +65,7 @@ export interface MatchedMeliDeal {
     couponSavings: number;
     finalPrice: number;
     totalDiscountPct: number;
+    isCheckboxCoupon?: boolean;
   } | null;
 }
 
@@ -68,7 +76,7 @@ export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
     nicheSlug: "casa",
     categoryName: "Casa & Cozinha",
     emoji: "🏠",
-    description: "Garimpa Air Fryers, eletroportáteis, aspiradores, panelas e organização.",
+    description: "Garimpa Air Fryers, eletroportáteis, aspiradores, panelas, cama/mesa/banho e utilidades.",
     keywords: [
       "air fryer",
       "fritadeira",
@@ -83,6 +91,19 @@ export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
       "casa",
       "mop",
       "garrafa",
+      "colchão",
+      "travesseiro",
+      "micro-ondas",
+      "forno",
+      "ventilador",
+      "ar-condicionado",
+      "cadeira",
+      "mesa",
+      "sofá",
+      "purificador",
+      "batedeira",
+      "ferro de passar",
+      "edredom",
     ],
     status: "ONLINE",
   },
@@ -92,14 +113,16 @@ export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
     nicheSlug: "moda",
     categoryName: "Moda & Vestuário",
     emoji: "👗",
-    description: "Garimpa vestidos, camisas, conjuntos, calçados, bolsas e moda íntima.",
+    description: "Garimpa vestidos, camisas, conjuntos, tênis, calçados, bolsas e moda íntima.",
     keywords: [
       "vestido",
       "camisa",
       "camiseta",
       "calça",
       "tênis",
+      "tenis",
       "sandália",
+      "sandalia",
       "bolsa",
       "moletom",
       "blusa",
@@ -109,16 +132,25 @@ export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
       "moda",
       "feminino",
       "masculina",
+      "masculino",
+      "cueca",
+      "calcinha",
+      "meia",
+      "sapato",
+      "bota",
+      "chinelo",
+      "bermuda",
+      "short",
     ],
     status: "ONLINE",
   },
   {
     id: "robo-beleza",
-    name: "Robô #03 • Beleza & Cuidados",
+    name: "Robô #03 • Beleza & Saúde",
     nicheSlug: "beleza",
-    categoryName: "Beleza & Cuidados",
+    categoryName: "Beleza & Saúde",
     emoji: "💄",
-    description: "Garimpa skincare, cremes Nivea, pranchas, secadores, perfumes e maquiagem.",
+    description: "Garimpa skincare, cremes, suplementos/whey, pranchas, secadores, perfumes e maquiagem.",
     keywords: [
       "nivea",
       "creme",
@@ -135,6 +167,17 @@ export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
       "beleza",
       "batom",
       "sérum",
+      "serum",
+      "whey",
+      "creatina",
+      "suplemento",
+      "vitamina",
+      "colágeno",
+      "colageno",
+      "barbeador",
+      "depilador",
+      "desodorante",
+      "fralda",
     ],
     status: "ONLINE",
   },
@@ -144,23 +187,36 @@ export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
     nicheSlug: "tech",
     categoryName: "Eletrônicos & Tech",
     emoji: "📱",
-    description: "Garimpa fones Bluetooth, caixas de som, smartwatches, TVs e celulares.",
+    description: "Garimpa fones Bluetooth, caixas de som, smartwatches, Smart TVs, celulares e notebooks.",
     keywords: [
       "fone",
       "bluetooth",
       "tws",
       "smartwatch",
       "relógio",
+      "relogio",
       "caixa de som",
       "jbl",
       "smart tv",
+      "tv ",
+      "televisão",
       "celular",
       "smartphone",
+      "iphone",
+      "samsung",
+      "motorola",
+      "xiaomi",
       "carregador",
       "notebook",
       "tablet",
       "mouse",
       "teclado",
+      "monitor",
+      "console",
+      "playstation",
+      "camera",
+      "câmera",
+      "impressora",
     ],
     status: "ONLINE",
   },
@@ -170,7 +226,7 @@ export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
     nicheSlug: "ferramentas",
     categoryName: "Ferramentas",
     emoji: "🛠️",
-    description: "Garimpa parafusadeiras, furadeiras, maletas de ferramentas e lavadoras.",
+    description: "Garimpa parafusadeiras, furadeiras, maletas de ferramentas, pneus, lavadoras e auto.",
     keywords: [
       "furadeira",
       "parafusadeira",
@@ -183,263 +239,213 @@ export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
       "bateria 21v",
       "bateria 12v",
       "impacto",
+      "pneu",
+      "automotivo",
+      "solda",
+      "compressor",
+      "esmerilhadeira",
+      "trena",
+      "escada",
     ],
     status: "ONLINE",
   },
 ];
 
-// Catálogo expandido de Ofertas do Dia do Mercado Livre separadas por nicho (com fotos oficiais CDN mlstatic)
-const MELI_DAILY_DEALS_POOL: Array<{
-  itemId: string;
-  title: string;
-  originalPrice: number;
-  currentPrice: number;
-  discountPercentage: number;
-  imageUrl: string;
-  originalUrl: string;
-  salesCountText: string;
-  isFull: boolean;
-  nicheSlug: NicheSlug;
-  categoryName: string;
-}> = [
-  // CASA & COZINHA
-  {
-    itemId: "MLB4941910291",
-    title: "Fritadeira Sem Óleo Air Fryer Mondial Family 4 Litros 1500W Inox Preto",
-    originalPrice: 469.9,
-    currentPrice: 229.9,
-    discountPercentage: 51,
-    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_781192-MLA49419102914_032022-F.webp",
-    originalUrl: "https://produto.mercadolivre.com.br/MLB-4941910291-fritadeira-sem-oleo-air-fryer-mondial-4l.html",
-    salesCountText: "+20k vendidos",
-    isFull: true,
-    nicheSlug: "casa",
-    categoryName: "Casa & Cozinha",
-  },
-  {
-    itemId: "MLB1140732289",
-    title: "Robô Aspirador De Pó WAP Robot W100 Varre Aspira Passa Pano Bivolt",
-    originalPrice: 499.9,
-    currentPrice: 279.9,
-    discountPercentage: 44,
-    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_840236-MLA114073228902_092023-F.webp",
-    originalUrl: "https://produto.mercadolivre.com.br/MLB-1140732289-robo-aspirador-wap-robot-w100.html",
-    salesCountText: "+10k vendidos",
-    isFull: true,
-    nicheSlug: "casa",
-    categoryName: "Casa & Cozinha",
-  },
-  {
-    itemId: "MLB1093972228",
-    title: "Organizador De Maquiagem E Bancada Giratório 360 Acrílico Transparente",
-    originalPrice: 109.9,
-    currentPrice: 49.9,
-    discountPercentage: 55,
-    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_801812-MLA109397222870_072023-F.webp",
-    originalUrl: "https://produto.mercadolivre.com.br/MLB-1093972228-organizador-maquiagem-giratorio-360.html",
-    salesCountText: "+7k vendidos",
-    isFull: true,
-    nicheSlug: "casa",
-    categoryName: "Casa & Cozinha",
-  },
-
-  // MODA & VESTUÁRIO
-  {
-    itemId: "MLB5455472680",
-    title: "Vestido Feminino Midi Canelado Manga Curta Elegante Casual Lastex",
-    originalPrice: 129.9,
-    currentPrice: 49.9,
-    discountPercentage: 62,
-    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_666085-MLA54554726803_032023-F.webp",
-    originalUrl: "https://produto.mercadolivre.com.br/MLB-5455472680-vestido-feminino-midi-canelado.html",
-    salesCountText: "+12k vendidos",
-    isFull: true,
-    nicheSlug: "moda",
-    categoryName: "Moda & Vestuário",
-  },
-  {
-    itemId: "MLB2819482012",
-    title: "Kit 3 Camisas Masculinas Básicas Algodão Confort Piquet Gola Polo",
-    originalPrice: 189.9,
-    currentPrice: 89.9,
-    discountPercentage: 53,
-    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_812391-MLB71004123891_082023-F.webp",
-    originalUrl: "https://produto.mercadolivre.com.br/MLB-2819482012-kit-3-camisas-polo-masculinas-algodao.html",
-    salesCountText: "+8k vendidos",
-    isFull: true,
-    nicheSlug: "moda",
-    categoryName: "Moda & Vestuário",
-  },
-  {
-    itemId: "MLB2948102941",
-    title: "Camisa Masculina Slim Fit Manga Longa Algodão Premium Casual Social",
-    originalPrice: 139.9,
-    currentPrice: 59.9,
-    discountPercentage: 57,
-    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_914588-MLB72199742468_102023-F.webp",
-    originalUrl: "https://produto.mercadolivre.com.br/MLB-2948102941-camisa-masculina-slim-fit-manga-longa-algodao.html",
-    salesCountText: "+15k vendidos",
-    isFull: true,
-    nicheSlug: "moda",
-    categoryName: "Moda & Vestuário",
-  },
-
-  // BELEZA & CUIDADOS
-  {
-    itemId: "MLB1000133786",
-    title: "Prancha Alisadora Mondial Golden Rose Bivolt P-20 Cerâmica Tourmaline",
-    originalPrice: 129.9,
-    currentPrice: 59.9,
-    discountPercentage: 54,
-    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_937184-MLA100013378601_042023-F.webp",
-    originalUrl: "https://produto.mercadolivre.com.br/MLB-1000133786-prancha-alisadora-mondial-golden-rose.html",
-    salesCountText: "+18k vendidos",
-    isFull: true,
-    nicheSlug: "beleza",
-    categoryName: "Beleza & Cuidados",
-  },
-  {
-    itemId: "MLB8147175024",
-    title: "NIVEA Creme Facial Antissinais Q10 Power Dia FPS 30 47g Oficial",
-    originalPrice: 79.9,
-    currentPrice: 42.9,
-    discountPercentage: 46,
-    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_727124-MLA81471750247_102023-F.webp",
-    originalUrl: "https://produto.mercadolivre.com.br/MLB-8147175024-nivea-creme-facial-antissinais-q10.html",
-    salesCountText: "+30k vendidos",
-    isFull: true,
-    nicheSlug: "beleza",
-    categoryName: "Beleza & Cuidados",
-  },
-
-  // ELETRÔNICOS & TECH
-  {
-    itemId: "MLB9990591502",
-    title: "Fone De Ouvido Sem Fio Bluetooth 5.3 TWS Microfone Bateria Longa Duração",
-    originalPrice: 119.9,
-    currentPrice: 44.9,
-    discountPercentage: 63,
-    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_943083-MLB99905915023_102023-F.webp",
-    originalUrl: "https://produto.mercadolivre.com.br/MLB-9990591502-fone-de-ouvido-bluetooth-tws.html",
-    salesCountText: "+25k vendidos",
-    isFull: true,
-    nicheSlug: "tech",
-    categoryName: "Eletrônicos & Tech",
-  },
-
-  // FERRAMENTAS
-  {
-    itemId: "MLB3568910291",
-    title: "Furadeira E Parafusadeira Nakasaki 12V Com Maleta Bateria Bivolt",
-    originalPrice: 199.9,
-    currentPrice: 89.9,
-    discountPercentage: 55,
-    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_759902-MLB72909403816_112023-F.webp",
-    originalUrl: "https://produto.mercadolivre.com.br/MLB-3568910291-furadeira-parafusadeira-nakasaki-12v-maleta.html",
-    salesCountText: "+10k vendidos",
-    isFull: true,
-    nicheSlug: "ferramentas",
-    categoryName: "Ferramentas",
-  },
-  {
-    itemId: "MLB3490192841",
-    title: "Kit Parafusadeira E Furadeira De Impacto 21V Nakasaki Maleta 2 Baterias",
-    originalPrice: 289.9,
-    currentPrice: 129.9,
-    discountPercentage: 55,
-    imageUrl: "https://http2.mlstatic.com/D_Q_NP_2X_669715-MLB72851410452_112023-F.webp",
-    originalUrl: "https://produto.mercadolivre.com.br/MLB-3490192841-parafusadeira-furadeira-impacto-21v-nakasaki.html",
-    salesCountText: "+5k vendidos",
-    isFull: true,
-    nicheSlug: "ferramentas",
-    categoryName: "Ferramentas",
-  },
-];
-
-// Cupons ativos rastreados pelo Robô Caçador de Cupons do Mercado Livre
-const ROBOT_RADAR_COUPONS: MeliSmartCoupon[] = [
-  {
-    id: "ml-cupom-full10",
-    code: "FULL10",
-    discountLabel: "10% OFF em itens FULL (até R$ 25)",
-    discountType: "PERCENT",
-    discountValue: 10,
-    maxDiscountAmount: 25,
-    minSpend: 40,
-    nicheSlug: "all",
-    categoryName: "Todos os Nichos (FULL)",
-    onlyFull: true,
-    validUntil: "Hoje às 23:59",
-    source: "ROBOT_RADAR",
-  },
-  {
-    id: "ml-cupom-meli15",
-    code: "MELI15OFF",
-    discountLabel: "R$ 15 OFF acima de R$ 79",
-    discountType: "FIXED",
-    discountValue: 15,
-    maxDiscountAmount: 15,
-    minSpend: 79,
-    nicheSlug: "all",
-    categoryName: "Todos os Nichos",
-    validUntil: "Hoje às 23:59",
-    source: "ROBOT_RADAR",
-  },
-  {
-    id: "ml-cupom-casa30",
-    code: "CASA30",
-    discountLabel: "R$ 30 OFF em Casa & Eletroportáteis acima de R$ 199",
-    discountType: "FIXED",
-    discountValue: 30,
-    maxDiscountAmount: 30,
-    minSpend: 199,
-    nicheSlug: "casa",
-    categoryName: "Casa & Cozinha",
-    validUntil: "Hoje às 23:59",
-    source: "ROBOT_RADAR",
-  },
-  {
-    id: "ml-cupom-beleza20",
-    code: "BELEZA20",
-    discountLabel: "20% OFF em Beleza & Cuidados (até R$ 35)",
-    discountType: "PERCENT",
-    discountValue: 20,
-    maxDiscountAmount: 35,
-    minSpend: 39,
-    nicheSlug: "beleza",
-    categoryName: "Beleza & Cuidados",
-    validUntil: "Hoje às 23:59",
-    source: "ROBOT_RADAR",
-  },
-  {
-    id: "ml-cupom-moda20",
-    code: "MODA20",
-    discountLabel: "R$ 20 OFF em Moda & Calçados acima de R$ 79",
-    discountType: "FIXED",
-    discountValue: 20,
-    maxDiscountAmount: 20,
-    minSpend: 79,
-    nicheSlug: "moda",
-    categoryName: "Moda & Vestuário",
-    validUntil: "Hoje às 23:59",
-    source: "ROBOT_RADAR",
-  },
-  {
-    id: "ml-cupom-ferramenta25",
-    code: "OFICINA25",
-    discountLabel: "R$ 25 OFF em Ferramentas acima de R$ 119",
-    discountType: "FIXED",
-    discountValue: 25,
-    maxDiscountAmount: 25,
-    minSpend: 119,
-    nicheSlug: "ferramentas",
-    categoryName: "Ferramentas",
-    validUntil: "Hoje às 23:59",
-    source: "ROBOT_RADAR",
-  },
-];
+// Cache rápido de 3 minutos para a varredura ao vivo do Mercado Livre
+let LIVE_OFFERS_CACHE: {
+  timestamp: number;
+  items: Array<{
+    itemId: string;
+    title: string;
+    originalPrice: number;
+    currentPrice: number;
+    discountPercentage: number;
+    imageUrl: string;
+    originalUrl: string;
+    salesCountText: string;
+    isFull: boolean;
+    onPageCoupon: {
+      label: string;
+      discountType: "PERCENT" | "FIXED";
+      discountValue: number;
+    } | null;
+  }>;
+} | null = null;
 
 export class MeliRobotArmyService {
+  /**
+   * Raspa AO VIVO a página oficial https://www.mercadolivre.com.br/ofertas
+   * extraindo os cards reais do dia e os cupons nativos ativos no anúncio ("OFF com Cupom")
+   */
+  static async scrapeLiveMercadoLivreDailyOffers(forceRefresh = false) {
+    if (
+      !forceRefresh &&
+      LIVE_OFFERS_CACHE &&
+      Date.now() - LIVE_OFFERS_CACHE.timestamp < 3 * 60 * 1000 &&
+      LIVE_OFFERS_CACHE.items.length > 0
+    ) {
+      return LIVE_OFFERS_CACHE.items;
+    }
+
+    const pagesToFetch = [
+      "https://www.mercadolivre.com.br/ofertas?page=1",
+      "https://www.mercadolivre.com.br/ofertas?page=2",
+    ];
+
+    const extractedItems: NonNullable<typeof LIVE_OFFERS_CACHE>["items"] = [];
+    const seenUrls = new Set<string>();
+
+    await Promise.all(
+      pagesToFetch.map(async (pageUrl) => {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 8500);
+          const res = await fetch(pageUrl, {
+            headers: {
+              "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+              Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "pt-BR,pt;q=0.9",
+            },
+            signal: controller.signal,
+            cache: "no-store",
+          });
+          clearTimeout(timer);
+
+          if (!res.ok) return;
+          const html = await res.text();
+          const cards = html.split("poly-card poly-card--grid-card").slice(1);
+
+          for (const card of cards) {
+            // 1. Imagem real do CDN mlstatic
+            const imgMatch = card.match(/class=["']poly-component__picture["'][^>]*src=["']([^"']+)["']/i);
+            const imageUrl = imgMatch ? imgMatch[1] : "";
+            if (!imageUrl || !imageUrl.startsWith("http")) continue;
+
+            // 2. Link e Título real do produto
+            const titleLinkMatch = card.match(
+              /<a[^>]+href=["']([^"']+)["'][^>]*class=["']poly-component__title["'][^>]*>([^<]+)<\/a>/i
+            );
+            if (!titleLinkMatch) continue;
+
+            const rawHref = titleLinkMatch[1].replace(/&amp;/g, "&").split("#")[0];
+            const cleanUrl = rawHref.split("?")[0];
+            if (seenUrls.has(cleanUrl)) continue;
+            seenUrls.add(cleanUrl);
+
+            const title = titleLinkMatch[2]
+              .replace(/&amp;/g, "&")
+              .replace(/&quot;/g, '"')
+              .replace(/&#39;/g, "'")
+              .trim();
+
+            // 3. Preço anterior ("Antes: X reais com Y centavos")
+            const prevMatch = card.match(
+              /andes-money-amount--previous[^>]*aria-label=["']Antes:\s*(\d+)\s*reais(?:\s*com\s*(\d+)\s*centavos)?["']/i
+            );
+            let originalPrice = 0;
+            if (prevMatch) {
+              const reais = parseInt(prevMatch[1], 10);
+              const cents = prevMatch[2] ? parseInt(prevMatch[2], 10) : 0;
+              originalPrice = Number((reais + cents / 100).toFixed(2));
+            }
+
+            // 4. Preço atual da oferta
+            const currSection = card.split("poly-price__current")[1] || "";
+            const currMatch = currSection.match(
+              /aria-label=["'](\d+)\s*reais(?:\s*com\s*(\d+)\s*centavos)?["']/i
+            );
+            let currentPrice = 0;
+            if (currMatch) {
+              const reais = parseInt(currMatch[1], 10);
+              const cents = currMatch[2] ? parseInt(currMatch[2], 10) : 0;
+              currentPrice = Number((reais + cents / 100).toFixed(2));
+            }
+            if (currentPrice <= 0) continue;
+
+            // 5. Desconto %
+            const discMatch = card.match(/(\d+)%\s*OFF/i);
+            let discountPercentage = discMatch ? parseInt(discMatch[1], 10) : 0;
+            if (originalPrice <= currentPrice) {
+              if (discountPercentage > 0 && discountPercentage < 95) {
+                originalPrice = Number((currentPrice / (1 - discountPercentage / 100)).toFixed(2));
+              } else {
+                originalPrice = Number((currentPrice * 1.25).toFixed(2));
+                discountPercentage = 20;
+              }
+            } else if (discountPercentage === 0) {
+              discountPercentage = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+            }
+
+            // 6. Vendas e selo FULL
+            const soldMatch = card.match(/\|\s*(\+[\d.,]+(?:mil)?\s*vendidos)/i);
+            const salesCountText = soldMatch ? soldMatch[1] : "Oferta do Dia";
+            const isFull = card.includes("Enviado pelo FULL") || card.includes("poly_full");
+
+            // 7. EXTRAÇÃO DE CUPOM REAL ATIVO NO ANÚNCIO DO MERCADO LIVRE (poly-coupons__pill)
+            let onPageCoupon: {
+              label: string;
+              discountType: "PERCENT" | "FIXED";
+              discountValue: number;
+            } | null = null;
+
+            if (card.includes("poly-coupons__pill")) {
+              const couponBlock = card.split("poly-coupons__pill")[1]?.slice(0, 600) || "";
+              const ariaMoney = couponBlock.match(/aria-label=["'](\d+)\s*reais/i);
+              const pctText = couponBlock.match(/(\d+)\s*%\s*OFF\s*com\s*Cupom/i);
+              const fracMoney = couponBlock.match(
+                /andes-money-amount__fraction[^>]*>(\d+)<\/span>/i
+              );
+
+              if (pctText) {
+                const val = parseInt(pctText[1], 10);
+                onPageCoupon = {
+                  label: `${val}% OFF no Anúncio`,
+                  discountType: "PERCENT",
+                  discountValue: val,
+                };
+              } else if (ariaMoney || fracMoney) {
+                const val = parseInt((ariaMoney ? ariaMoney[1] : fracMoney![1]), 10);
+                onPageCoupon = {
+                  label: `R$ ${val} OFF no Anúncio`,
+                  discountType: "FIXED",
+                  discountValue: val,
+                };
+              }
+            }
+
+            const mlbId =
+              MercadoLivreScraperService.extractMlbId(rawHref) ||
+              `MLB${Math.floor(100000 + Math.random() * 900000)}`;
+
+            extractedItems.push({
+              itemId: mlbId,
+              title,
+              originalPrice,
+              currentPrice,
+              discountPercentage,
+              imageUrl,
+              originalUrl: rawHref,
+              salesCountText,
+              isFull,
+              onPageCoupon,
+            });
+          }
+        } catch (err) {
+          console.warn("Aviso ao raspar página de ofertas do ML:", err);
+        }
+      })
+    );
+
+    if (extractedItems.length > 0) {
+      LIVE_OFFERS_CACHE = {
+        timestamp: Date.now(),
+        items: extractedItems,
+      };
+    }
+
+    return extractedItems;
+  }
+
   /**
    * Classifica automaticamente o nicho de um produto pelo título e categoria
    */
@@ -462,7 +468,6 @@ export class MeliRobotArmyService {
       }
     }
 
-    // Fallback inteligente por categoria bruta
     if (text.includes("moda") || text.includes("roupa") || text.includes("calçado")) {
       return {
         nicheSlug: "moda",
@@ -471,15 +476,15 @@ export class MeliRobotArmyService {
         robotName: "Robô #02 • Moda & Calçados",
       };
     }
-    if (text.includes("beleza") || text.includes("perfume") || text.includes("cabelo")) {
+    if (text.includes("beleza") || text.includes("perfume") || text.includes("cabelo") || text.includes("saúde")) {
       return {
         nicheSlug: "beleza",
-        categoryName: "Beleza & Cuidados",
+        categoryName: "Beleza & Saúde",
         robotId: "robo-beleza",
-        robotName: "Robô #03 • Beleza & Cuidados",
+        robotName: "Robô #03 • Beleza & Saúde",
       };
     }
-    if (text.includes("eletr") || text.includes("tech") || text.includes("inform")) {
+    if (text.includes("eletr") || text.includes("tech") || text.includes("inform") || text.includes("gamer")) {
       return {
         nicheSlug: "tech",
         categoryName: "Eletrônicos & Tech",
@@ -487,7 +492,7 @@ export class MeliRobotArmyService {
         robotName: "Robô #04 • Eletrônicos & Tech",
       };
     }
-    if (text.includes("ferramenta") || text.includes("auto")) {
+    if (text.includes("ferramenta") || text.includes("auto") || text.includes("moto")) {
       return {
         nicheSlug: "ferramentas",
         categoryName: "Ferramentas",
@@ -505,12 +510,13 @@ export class MeliRobotArmyService {
   }
 
   /**
-   * Converte um cupom salvo no banco de dados para a estrutura inteligente de cálculo
+   * Converte um cupom real salvo no banco de dados pela usuária para cálculo automático
    */
   static parseDbCoupon(dbCoupon: any): MeliSmartCoupon {
     const discountStr = String(dbCoupon.discount || "10% OFF");
     const percentMatch = discountStr.match(/(\d+(?:[.,]\d+)?)\s*%/);
-    const fixedMatch = discountStr.match(/R\$\s*(\d+(?:[.,]\d+)?)/i) || discountStr.match(/(\d+(?:[.,]\d+)?)/);
+    const fixedMatch =
+      discountStr.match(/R\$\s*(\d+(?:[.,]\d+)?)/i) || discountStr.match(/(\d+(?:[.,]\d+)?)/);
 
     let discountType: "PERCENT" | "FIXED" = "PERCENT";
     let discountValue = 10;
@@ -527,7 +533,7 @@ export class MeliRobotArmyService {
     let nicheSlug: NicheSlug | "all" = "all";
     if (catText.includes("casa") || catText.includes("cozinha")) nicheSlug = "casa";
     else if (catText.includes("moda") || catText.includes("roupa")) nicheSlug = "moda";
-    else if (catText.includes("beleza")) nicheSlug = "beleza";
+    else if (catText.includes("beleza") || catText.includes("saúde")) nicheSlug = "beleza";
     else if (catText.includes("eletr") || catText.includes("tech")) nicheSlug = "tech";
     else if (catText.includes("ferramenta")) nicheSlug = "ferramentas";
 
@@ -537,7 +543,7 @@ export class MeliRobotArmyService {
       discountLabel: discountStr,
       discountType,
       discountValue,
-      maxDiscountAmount: discountType === "PERCENT" ? 50 : discountValue,
+      maxDiscountAmount: discountType === "PERCENT" ? 60 : discountValue,
       minSpend: Number(dbCoupon.minSpend || 0),
       nicheSlug,
       categoryName: dbCoupon.category || "Todos os Nichos",
@@ -563,22 +569,18 @@ export class MeliRobotArmyService {
     finalPrice: number;
     totalDiscountPct: number;
   } {
-    // 1. Verifica nicho
     if (coupon.nicheSlug !== "all" && coupon.nicheSlug !== nicheSlug) {
       return { eligible: false, couponSavings: 0, finalPrice: dealPrice, totalDiscountPct: 0 };
     }
 
-    // 2. Verifica se exige FULL
     if (coupon.onlyFull && !isFull) {
       return { eligible: false, couponSavings: 0, finalPrice: dealPrice, totalDiscountPct: 0 };
     }
 
-    // 3. Verifica valor mínimo da compra
     if (dealPrice < coupon.minSpend) {
       return { eligible: false, couponSavings: 0, finalPrice: dealPrice, totalDiscountPct: 0 };
     }
 
-    // 4. Calcula desconto do cupom em R$
     let savings = 0;
     if (coupon.discountType === "PERCENT") {
       savings = (dealPrice * coupon.discountValue) / 100;
@@ -603,9 +605,9 @@ export class MeliRobotArmyService {
   }
 
   /**
-   * Executa a varredura completa do Exército de Robôs (Produtos por Nicho + Cupons + Cruzamento)
+   * Executa a varredura completa do Exército de Robôs (100% AO VIVO do Mercado Livre + Cupons Reais)
    */
-  static async runArmyScan(customUrls?: string[]): Promise<{
+  static async runArmyScan(customUrls?: string[], forceRefresh = false): Promise<{
     robots: RobotAgentInfo[];
     coupons: MeliSmartCoupon[];
     deals: MatchedMeliDeal[];
@@ -613,11 +615,8 @@ export class MeliRobotArmyService {
   }> {
     const affiliateTag = process.env.MERCADO_LIVRE_AFFILIATE_TAG || "clma9212398";
 
-    // 1. Carrega cupons ativos do Mercado Livre no banco + cupons do Robô Caçador
+    // 1. Carrega APENAS cupons reais cadastrados no banco + cupons reais detectados nos anúncios do ML
     const couponsMap = new Map<string, MeliSmartCoupon>();
-    for (const rc of ROBOT_RADAR_COUPONS) {
-      couponsMap.set(rc.code.toUpperCase(), rc);
-    }
 
     try {
       const dbCoupons = await prisma.coupon.findMany({
@@ -639,9 +638,9 @@ export class MeliRobotArmyService {
       }
     } catch {}
 
-    const allCoupons = Array.from(couponsMap.values());
+    // 2. Raspa AO VIVO as ofertas do dia no Mercado Livre (com detecção de "OFF com Cupom" real no anúncio)
+    const liveScrapedOffers = await this.scrapeLiveMercadoLivreDailyOffers(forceRefresh);
 
-    // 2. Se o usuário enviou links extras para o robô varrer ao vivo, resolve via MercadoLivreScraperService
     const rawItems: Array<{
       itemId: string;
       title: string;
@@ -653,8 +652,15 @@ export class MeliRobotArmyService {
       salesCountText: string;
       isFull: boolean;
       rawCategory?: string;
+      isLiveFromMeli?: boolean;
+      onPageCoupon?: {
+        label: string;
+        discountType: "PERCENT" | "FIXED";
+        discountValue: number;
+      } | null;
     }> = [];
 
+    // Se o usuário enviou links específicos para varrer ao vivo
     if (customUrls && customUrls.length > 0) {
       const scrapedItems = await MercadoLivreScraperService.resolveLinks(customUrls);
       for (const s of scrapedItems) {
@@ -669,61 +675,57 @@ export class MeliRobotArmyService {
           salesCountText: s.salesCountText || "+1k vendidos",
           isFull: s.isFull,
           rawCategory: s.category,
+          isLiveFromMeli: true,
         });
       }
     }
 
-    // 3. Carrega também produtos recentes do Mercado Livre já salvos no banco
-    try {
-      const dbProducts = await prisma.product.findMany({
-        where: {
-          OR: [
-            { originalUrl: { contains: "mercadolivre" } },
-            { originalUrl: { contains: "meli.la" } },
-          ],
-        },
-        orderBy: { createdAt: "desc" },
-        take: 25,
-      });
+    // Adiciona todas as ofertas reais raspadas ao vivo do Mercado Livre (/ofertas)
+    // Priorizando no topo os produtos que têm Cupom Nativo Ativo no Anúncio!
+    const sortedLive = [...liveScrapedOffers].sort((a, b) => {
+      if (a.onPageCoupon && !b.onPageCoupon) return -1;
+      if (!a.onPageCoupon && b.onPageCoupon) return 1;
+      return b.discountPercentage - a.discountPercentage;
+    });
 
-      for (const p of dbProducts) {
-        if (!p.imageUrl || p.imageUrl.includes("unsplash")) continue;
-        const orig = Number(p.originalPrice) || Number(p.currentPrice) * 1.35;
-        const curr = Number(p.currentPrice);
-        const disc = Math.round(((orig - curr) / orig) * 100) || 25;
-
-        rawItems.push({
-          itemId: MercadoLivreScraperService.extractMlbId(p.originalUrl) || `MLB-${p.id.slice(0, 8)}`,
-          title: p.name,
-          originalPrice: Number(orig.toFixed(2)),
-          currentPrice: Number(curr.toFixed(2)),
-          discountPercentage: disc,
-          imageUrl: p.imageUrl,
-          originalUrl: p.originalUrl,
-          salesCountText: "+5k vendidos",
-          isFull: true,
-          rawCategory: p.category,
-        });
-      }
-    } catch {}
-
-    // 4. Adiciona o pool curado das Melhores Ofertas do Dia do Mercado Livre
-    for (const item of MELI_DAILY_DEALS_POOL) {
+    for (const liveItem of sortedLive) {
       rawItems.push({
-        itemId: item.itemId,
-        title: item.title,
-        originalPrice: item.originalPrice,
-        currentPrice: item.currentPrice,
-        discountPercentage: item.discountPercentage,
-        imageUrl: item.imageUrl,
-        originalUrl: item.originalUrl,
-        salesCountText: item.salesCountText,
-        isFull: item.isFull,
-        rawCategory: item.categoryName,
+        ...liveItem,
+        isLiveFromMeli: true,
       });
+
+      // Registra o grupo de cupom nativo do anúncio na barra de filtros de cupons reais
+      if (liveItem.onPageCoupon) {
+        const couponKey =
+          liveItem.onPageCoupon.discountType === "PERCENT"
+            ? `NO-ANUNCIO-${liveItem.onPageCoupon.discountValue}%OFF`
+            : `NO-ANUNCIO-R$${liveItem.onPageCoupon.discountValue}OFF`;
+
+        if (!couponsMap.has(couponKey)) {
+          couponsMap.set(couponKey, {
+            id: `live-onpage-${couponKey}`,
+            code: couponKey,
+            discountLabel: `${liveItem.onPageCoupon.label} (Ativar na página do ML)`,
+            discountType: liveItem.onPageCoupon.discountType,
+            discountValue: liveItem.onPageCoupon.discountValue,
+            maxDiscountAmount:
+              liveItem.onPageCoupon.discountType === "FIXED"
+                ? liveItem.onPageCoupon.discountValue
+                : 100,
+            minSpend: 0,
+            nicheSlug: "all",
+            categoryName: "Cupom Nativo no Anúncio ML",
+            validUntil: "Ativo agora no anúncio",
+            source: "ON_PAGE_CHECKBOX",
+          });
+        }
+      }
     }
 
-    // 5. Remove duplicados e cruza cada item com seu Robô de Nicho + Cupons Elegíveis
+    const dbCouponsList = Array.from(couponsMap.values()).filter((c) => c.source === "DATABASE");
+    const allCoupons = Array.from(couponsMap.values());
+
+    // 3. Classifica por Nicho e calcula o preço final com o cupom real do anúncio + cupons cadastrados
     const seenTitles = new Set<string>();
     const deals: MatchedMeliDeal[] = [];
     const nicheSummary: Record<string, { count: number; withCouponCount: number }> = {
@@ -746,11 +748,38 @@ export class MeliRobotArmyService {
         affiliateTag
       );
 
-      // Avalia todos os cupons ativos neste item
       const applicableCoupons: MatchedMeliDeal["applicableCoupons"] = [];
-      for (const coupon of allCoupons) {
+
+      // A) Se o próprio anúncio do Mercado Livre tem cupom nativo ativo ("R$ 20 OFF com Cupom")
+      if (item.onPageCoupon) {
+        const couponKey =
+          item.onPageCoupon.discountType === "PERCENT"
+            ? `NO-ANUNCIO-${item.onPageCoupon.discountValue}%OFF`
+            : `NO-ANUNCIO-R$${item.onPageCoupon.discountValue}OFF`;
+
+        const savings =
+          item.onPageCoupon.discountType === "PERCENT"
+            ? Number(((item.currentPrice * item.onPageCoupon.discountValue) / 100).toFixed(2))
+            : item.onPageCoupon.discountValue;
+
+        const finalPrice = Number(Math.max(1, item.currentPrice - savings).toFixed(2));
+        const baseOrig = Math.max(item.originalPrice, item.currentPrice);
+        const totalDiscountPct = Math.round(((baseOrig - finalPrice) / baseOrig) * 100);
+
+        applicableCoupons.push({
+          code: couponKey,
+          discountLabel: `${item.onPageCoupon.label} (Marcar "Aplicar cupom" no anúncio)`,
+          couponSavings: savings,
+          finalPrice,
+          totalDiscountPct,
+          isCheckboxCoupon: true,
+        });
+      }
+
+      // B) Testa também cupons alfanuméricos reais cadastrados pela usuária no banco
+      for (const dbCoupon of dbCouponsList) {
         const evalRes = this.evaluateCouponOnProduct(
-          coupon,
+          dbCoupon,
           item.currentPrice,
           item.originalPrice,
           nicheInfo.nicheSlug,
@@ -758,16 +787,16 @@ export class MeliRobotArmyService {
         );
         if (evalRes.eligible) {
           applicableCoupons.push({
-            code: coupon.code,
-            discountLabel: coupon.discountLabel,
+            code: dbCoupon.code,
+            discountLabel: dbCoupon.discountLabel,
             couponSavings: evalRes.couponSavings,
             finalPrice: evalRes.finalPrice,
             totalDiscountPct: evalRes.totalDiscountPct,
+            isCheckboxCoupon: false,
           });
         }
       }
 
-      // Ordena pelo maior desconto em R$
       applicableCoupons.sort((a, b) => b.couponSavings - a.couponSavings);
       const bestCoupon = applicableCoupons.length > 0 ? applicableCoupons[0] : null;
 
@@ -794,6 +823,8 @@ export class MeliRobotArmyService {
         categoryName: nicheInfo.categoryName,
         robotId: nicheInfo.robotId,
         robotName: nicheInfo.robotName,
+        isLiveFromMeli: item.isLiveFromMeli,
+        onPageCouponText: item.onPageCoupon ? item.onPageCoupon.label : null,
         applicableCoupons,
         bestCoupon,
       });

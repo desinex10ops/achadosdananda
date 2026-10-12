@@ -6,11 +6,13 @@ import { generateOfferMessage } from "@/modules/templates/engine";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const scanResult = await MeliRobotArmyService.runArmyScan();
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get("refresh") === "true";
 
-    // Carrega grupos ativos com suas categorias para mostrar o roteamento por nicho
+    const scanResult = await MeliRobotArmyService.runArmyScan(undefined, forceRefresh);
+
     let groups: any[] = [];
     try {
       groups = await prisma.group.findMany({
@@ -46,13 +48,31 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action } = body;
 
-    // AÇÃO 1: Varrer URLs específicas do Mercado Livre ao vivo e cruzar com cupons e nichos
+    // AÇÃO 1: Varrer URLs específicas do Mercado Livre ao vivo
     if (action === "SCAN_URLS") {
       const urls: string[] = Array.isArray(body.urls) ? body.urls : [];
-      const scanResult = await MeliRobotArmyService.runArmyScan(urls);
+      const scanResult = await MeliRobotArmyService.runArmyScan(urls, true);
       return NextResponse.json({
         success: true,
         ...scanResult,
+      });
+    }
+
+    // AÇÃO 1.5: Excluir / Marcar cupom digitável como esgotado
+    if (action === "DELETE_COUPON") {
+      const { couponId, code } = body;
+      if (couponId && String(couponId).startsWith("db-")) {
+        const realId = String(couponId).replace(/^db-/, "");
+        await prisma.coupon.delete({ where: { id: realId } }).catch(() => {});
+      } else if (code) {
+        await prisma.coupon
+          .deleteMany({ where: { code: String(code).toUpperCase() } })
+          .catch(() => {});
+      }
+      const updatedScan = await MeliRobotArmyService.runArmyScan();
+      return NextResponse.json({
+        success: true,
+        ...updatedScan,
       });
     }
 
@@ -78,7 +98,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // AÇÃO 2: Cadastrar novo Cupom do Mercado Livre e já disponibilizar no cruzador e na página Cupons VIP
+    // AÇÃO 2: Cadastrar novo Cupom Real do Mercado Livre
     if (action === "CREATE_COUPON") {
       const { code, discount, minSpend, category, notes } = body;
       if (!code || !discount) {
@@ -96,7 +116,7 @@ export async function POST(request: Request) {
           minSpend: minSpend ? parseFloat(String(minSpend)) : 0,
           category: category || "Todos os Nichos",
           status: "ACTIVE",
-          notes: notes || "Capturado pelo Robô Caçador de Cupons ML",
+          notes: notes || "Cupom oficial Mercado Livre",
         },
       });
 
@@ -120,6 +140,7 @@ export async function POST(request: Request) {
         finalPrice?: number;
         couponCode?: string | null;
         couponDiscountLabel?: string | null;
+        isCheckboxCoupon?: boolean;
         categoryName: string;
         nicheSlug: string;
         isFull?: boolean;
@@ -134,19 +155,16 @@ export async function POST(request: Request) {
 
       const affiliateTag = process.env.MERCADO_LIVRE_AFFILIATE_TAG || "clma9212398";
 
-      // Busca template padrão
       let template = await prisma.template.findFirst({ where: { isDefault: true } });
       if (!template) {
         template = await prisma.template.findFirst();
       }
 
-      // Busca todos os grupos ativos com suas categorias
       const activeGroups = await prisma.group.findMany({
         where: { isActive: true },
         include: { category: true },
       });
 
-      // Busca última publicação para calcular o próximo horário na fila
       const lastPub = await prisma.publication.findFirst({
         where: { status: { in: ["PENDING", "SCHEDULED"] } },
         orderBy: { scheduledFor: "desc" },
@@ -172,6 +190,17 @@ export async function POST(request: Request) {
         const discPct = Math.round(((origPrice - effectivePrice) / origPrice) * 100) || 25;
         const savedAmount = Number((origPrice - effectivePrice).toFixed(2));
 
+        // Se for cupom nativo de checkbox na página do anúncio, orienta o cliente a marcar o cupom no anúncio
+        const displayCouponForOffer = item.isCheckboxCoupon
+          ? "ATIVAR NO ANÚNCIO"
+          : item.couponCode || null;
+
+        const calloutText = item.isCheckboxCoupon
+          ? `🎟️ CUPOM ATIVO NO ANÚNCIO (${item.couponDiscountLabel || "Aplicar na página"})`
+          : item.couponCode
+          ? `🎟️ COM CUPOM ${item.couponCode}`
+          : "🔥 OFERTA DO DIA MERCADO LIVRE";
+
         // 1. Cria Produto
         const product = await prisma.product.create({
           data: {
@@ -186,11 +215,7 @@ export async function POST(request: Request) {
           },
         });
 
-        // 2. Cria Oferta (já aparece na Vitrine /achados e no Radar)
-        const calloutText = item.couponCode
-          ? `🎟️ COM CUPOM ${item.couponCode}${item.couponDiscountLabel ? ` (${item.couponDiscountLabel})` : ""}`
-          : "🔥 OFERTA DO DIA MERCADO LIVRE";
-
+        // 2. Cria Oferta
         const offer = await prisma.offer.create({
           data: {
             productId: product.id,
@@ -201,12 +226,12 @@ export async function POST(request: Request) {
             currentPrice: effectivePrice,
             discountPercentage: discPct,
             savedAmount,
-            couponCode: item.couponCode || null,
+            couponCode: displayCouponForOffer,
             shippingInfo: item.isFull ? "Frete Grátis FULL ⚡" : "Frete Grátis",
             originalUrl: item.originalUrl,
             affiliateUrl: finalAffiliateUrl,
             status: "SCHEDULED",
-            priority: item.couponCode ? 3 : 2,
+            priority: displayCouponForOffer ? 3 : 2,
           },
         });
 
@@ -224,7 +249,6 @@ export async function POST(request: Request) {
           );
         });
 
-        // Se não houver grupo específico daquele nicho ainda, envia para os grupos gerais/ativos com WhatsApp conectado
         if (targetGroups.length === 0) {
           targetGroups = activeGroups.filter((g) => !!g.whatsappJid);
         }
@@ -232,7 +256,7 @@ export async function POST(request: Request) {
           targetGroups = activeGroups;
         }
 
-        // 4. Monta a mensagem formatada com o cálculo do cupom
+        // 4. Monta a mensagem formatada
         let generatedText = "";
         if (template) {
           generatedText = generateOfferMessage(
@@ -243,7 +267,9 @@ export async function POST(request: Request) {
               currentPrice: offer.currentPrice,
               discountPercentage: offer.discountPercentage,
               savedAmount: offer.savedAmount,
-              couponCode: offer.couponCode,
+              couponCode: item.isCheckboxCoupon
+                ? `Ative o cupom direto na página do anúncio!`
+                : offer.couponCode,
               shippingInfo: offer.shippingInfo,
               affiliateUrl: finalAffiliateUrl,
               marketplaceName: "Mercado Livre",
@@ -256,7 +282,11 @@ export async function POST(request: Request) {
             .replace(".", ",")}~\nPor apenas: *R$ ${offer.currentPrice
             .toFixed(2)
             .replace(".", ",")}* (${offer.discountPercentage}% OFF)${
-            offer.couponCode ? `\n🎟️ Use o Cupom: *${offer.couponCode}*` : ""
+            item.isCheckboxCoupon
+              ? `\n🎟️ *Dica:* Marque a caixinha "Aplicar cupom" dentro do anúncio!`
+              : offer.couponCode
+              ? `\n🎟️ Use o Cupom: *${offer.couponCode}*`
+              : ""
           }\n🚚 ${offer.shippingInfo}\n\n👇 COMPRE NO MERCADO LIVRE:\n${finalAffiliateUrl}`;
         }
 
@@ -286,7 +316,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         queuedCount,
-        message: `${queuedCount} oferta(s) com cupom enviadas para a Vitrine e Fila do WhatsApp separadas por nicho!`,
+        message: `${queuedCount} oferta(s) reais do Mercado Livre enviadas para a Vitrine e Fila do WhatsApp separadas por nicho!`,
       });
     }
 
