@@ -107,7 +107,7 @@ export class EvolutionClient {
         instanceName,
         qrcode: true,
         integration: "WHATSAPP-BAILEYS",
-        groupsIgnore: true,
+        groupsIgnore: false,
         syncFullHistory: false,
         readMessages: false,
         readStatus: false,

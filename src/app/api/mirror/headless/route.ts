@@ -17,6 +17,9 @@ const KNOWN_OFFER_GROUP_JIDS = new Set([
   "120363425588077327@g.us", // Promo de Rica 🛍️ #35
   "120363402581039628@g.us", // OFERTAS IMPERDÍVEIS #87
   "120363427384826701@g.us", // AchaDIN MODA & BELEZA 03 🛍💰
+  "120363427798897733@g.us", // Irmãs das Promos | 23
+  "120363425904664909@g.us", // #13 IAChadinhos Grandes Marcas
+  "120363428230716779@g.us", // 🚨ESQUECEU ?! #02
   "120363411159407564@g.us", // 🧢 BLCK BRASIL - CLUB VIP #59
   "120363414788461803@g.us", // FÊ ACHOU #04
 ]);
@@ -38,6 +41,19 @@ function extractMessageText(msgObj: any): string {
     m.videoMessage?.caption ||
     ""
   );
+}
+
+// Resolve o JID real caso o targetGroupId salvo seja um ID interno do Prisma
+async function resolveTargetJid(targetGroupId?: string | null): Promise<string | null> {
+  if (!targetGroupId) return null;
+  if (targetGroupId.includes("@g.us")) return targetGroupId.trim();
+  try {
+    const dbGroup = await prisma.group.findUnique({
+      where: { id: targetGroupId },
+    });
+    if (dbGroup?.whatsappJid) return dbGroup.whatsappJid.trim();
+  } catch {}
+  return null;
 }
 
 // Função auxiliar para disparar 1 oferta clonada (com ou sem a foto original do grupo fonte)
@@ -326,6 +342,125 @@ export async function POST(request: Request) {
       offers = [],
     } = body;
 
+    // Ação 0: Sincronização Automática em Tempo Real das Regras Ativas (Auto-Forward)
+    if (action === "AUTO_SYNC_RULES") {
+      const activeRules = await (prisma as any).groupMirrorRule.findMany({
+        where: { isActive: true },
+      });
+
+      if (!activeRules || activeRules.length === 0) {
+        return NextResponse.json({
+          success: true,
+          autoForwardedCount: 0,
+          details: [],
+        });
+      }
+
+      let autoForwardedCount = 0;
+      const details: any[] = [];
+
+      for (const rule of activeRules) {
+        const srcJid = rule.sourceGroupId;
+        const resolvedTargetJid = await resolveTargetJid(rule.targetGroupId);
+        if (!srcJid || !srcJid.includes("@g.us") || !resolvedTargetJid) {
+          continue;
+        }
+
+        // Busca as últimas 8 mensagens do grupo de origem
+        const msgResp = await fetch(
+          `${EVOLUTION_BASE_URL}/chat/findMessages/${encodeURIComponent(
+            instanceName
+          )}`,
+          {
+            method: "POST",
+            headers: {
+              apikey: EVOLUTION_API_KEY,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              where: { key: { remoteJid: srcJid } },
+              limit: 8,
+            }),
+            cache: "no-store",
+          }
+        );
+
+        if (!msgResp.ok) continue;
+        const msgData = await msgResp.json();
+        const records: any[] = msgData?.messages?.records || [];
+
+        const ruleCreatedMs = new Date(rule.createdAt).getTime();
+        const ruleUpdatedMs = new Date(rule.updatedAt).getTime();
+        // Se updatedAt === createdAt (regra recém-criada), aceita ofertas dos últimos 5 minutos
+        const lastCheckpointSec =
+          Math.abs(ruleUpdatedMs - ruleCreatedMs) < 1500
+            ? Math.floor((ruleCreatedMs - 5 * 60 * 1000) / 1000)
+            : Math.floor(ruleUpdatedMs / 1000);
+
+        // Ordena do mais antigo para o mais novo entre os novos
+        const newOfferRecords = records
+          .filter((rec) => {
+            const ts = Number(rec.messageTimestamp || 0);
+            const txt = extractMessageText(rec);
+            return ts > lastCheckpointSec && /https?:\/\/[^\s]+/i.test(txt);
+          })
+          .sort(
+            (a, b) =>
+              Number(a.messageTimestamp || 0) - Number(b.messageTimestamp || 0)
+          );
+
+        let maxTimestampProcessed = lastCheckpointSec;
+
+        for (const rec of newOfferRecords) {
+          const ts = Number(rec.messageTimestamp || 0);
+          if (ts > maxTimestampProcessed) maxTimestampProcessed = ts;
+
+          const text = extractMessageText(rec);
+          const { clonedText: convertedText, replacedLinks } =
+            await MirrorEngine.cloneMessageAsync(text);
+
+          if (replacedLinks.length === 0 && rule.filterOfficialOnly) {
+            continue;
+          }
+
+          const sendRes = await dispatchSingleClonedOffer({
+            instanceName,
+            targetJid: resolvedTargetJid,
+            sendWithImage: rule.mediaFormat !== "PREVIEW",
+            messageId: rec.key?.id,
+            clonedText: convertedText,
+            hasImage: Boolean(rec.message?.imageMessage),
+          });
+
+          if (sendRes.success) {
+            autoForwardedCount++;
+            details.push({
+              ruleId: rule.id,
+              sourceGroupName: rule.sourceGroupName,
+              targetGroupName: rule.targetGroupName,
+              messageId: rec.key?.id,
+            });
+          }
+        }
+
+        // Atualiza o checkpoint no banco para nunca enviar a mesma oferta 2 vezes
+        if (maxTimestampProcessed > lastCheckpointSec) {
+          await (prisma as any).groupMirrorRule.update({
+            where: { id: rule.id },
+            data: {
+              updatedAt: new Date((maxTimestampProcessed + 1) * 1000),
+            },
+          });
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        autoForwardedCount,
+        details,
+      });
+    }
+
     // Ação 1: Verificar status / Obter QR Code para conectar WhatsApp no navegador oculto
     if (action === "GET_QR") {
       const evoClient = new EvolutionClient({
@@ -353,7 +488,8 @@ export async function POST(request: Request) {
 
     // Ação 2: Enviar uma única oferta clonada para o grupo de destino escolhido
     if (action === "SEND_OFFER") {
-      if (!targetJid || !clonedText) {
+      const resolvedTarget = await resolveTargetJid(targetJid);
+      if (!resolvedTarget || !clonedText) {
         return NextResponse.json(
           {
             success: false,
@@ -365,7 +501,7 @@ export async function POST(request: Request) {
 
       const result = await dispatchSingleClonedOffer({
         instanceName,
-        targetJid,
+        targetJid: resolvedTarget,
         sendWithImage,
         messageId,
         clonedText,
@@ -380,7 +516,7 @@ export async function POST(request: Request) {
               message: `Oferta capturada de "${
                 sourceGroupName || sourceJid || "Grupo Fonte"
               }" enviada com seu link de afiliada para "${
-                targetGroupName || targetJid
+                targetGroupName || resolvedTarget
               }".`,
               type: "SUCCESS",
               link: "/espelhamento",
@@ -398,7 +534,8 @@ export async function POST(request: Request) {
 
     // Ação 3: Enviar lote de ofertas clonadas para o grupo de destino
     if (action === "SEND_BATCH") {
-      if (!targetJid || !Array.isArray(offers) || offers.length === 0) {
+      const resolvedTarget = await resolveTargetJid(targetJid);
+      if (!resolvedTarget || !Array.isArray(offers) || offers.length === 0) {
         return NextResponse.json(
           {
             success: false,
@@ -415,7 +552,7 @@ export async function POST(request: Request) {
       for (const item of batchToProcess) {
         const res = await dispatchSingleClonedOffer({
           instanceName,
-          targetJid,
+          targetJid: resolvedTarget,
           sendWithImage,
           messageId: item.messageId,
           clonedText: item.clonedText,

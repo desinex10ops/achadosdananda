@@ -196,6 +196,25 @@ export default function EspelhamentoPage() {
   useEffect(() => {
     loadData();
     loadHeadlessFeed("120363425588077327@g.us");
+
+    // Sincronizador ativo a cada 20s para regras automáticas salvas
+    const syncTimer = setInterval(async () => {
+      try {
+        const res = await fetch("/api/mirror/headless", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "AUTO_SYNC_RULES" }),
+        });
+        const json = await res.json();
+        if (json.success && json.autoForwardedCount > 0) {
+          showToast(
+            `⚡ ${json.autoForwardedCount} nova(s) oferta(s) capturada(s) e enviada(s) automaticamente para o seu grupo!`
+          );
+        }
+      } catch {}
+    }, 20000);
+
+    return () => clearInterval(syncTimer);
   }, []);
 
   const handleSourceGroupChange = (newJid: string) => {
