@@ -405,25 +405,18 @@ export class MeliRobotArmyService {
                   discountType: "PERCENT",
                   discountValue: val,
                 };
-              } else if (ariaMoney) {
+              } else if (ariaMoney && hasOffWord) {
                 const val = Number(
                   (
                     parseInt(ariaMoney[1], 10) +
                     (ariaMoney[2] ? parseInt(ariaMoney[2], 10) : 0) / 100
                   ).toFixed(2)
                 );
-                if (hasOffWord) {
+                if (val >= 2 && val <= currentPrice * 0.35) {
                   onPageCoupon = {
-                    label: `R$ ${Math.round(val)} OFF no Anúncio`,
+                    label: `R$ ${Math.round(val)} OFF com Cupom da Loja`,
                     discountType: "FIXED",
                     discountValue: Math.round(val),
-                  };
-                } else if (val < currentPrice && currentPrice - val >= 2) {
-                  const diff = Math.round(currentPrice - val);
-                  onPageCoupon = {
-                    label: `R$ ${diff} OFF no Anúncio`,
-                    discountType: "FIXED",
-                    discountValue: diff,
                   };
                 }
               }

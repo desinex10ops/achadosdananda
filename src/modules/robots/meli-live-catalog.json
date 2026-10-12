@@ -58,7 +58,7 @@
     "salesCountText": "+10mil vendidos",
     "isFull": true,
     "onPageCoupon": {
-      "label": "R$ 20 OFF no Anúncio",
+      "label": "Cupom de Loja (R$ 20 OFF conforme compra mínima no ML)",
       "discountType": "FIXED",
       "discountValue": 20
     }
@@ -133,11 +133,7 @@
     "originalUrl": "https://www.mercadolivre.com.br/samsung-galaxy-a57-256-gb-e-8-ram-dual-sim-lilas/p/MLB69983495",
     "salesCountText": "+10mil vendidos",
     "isFull": true,
-    "onPageCoupon": {
-      "label": "R$ 44 OFF no Anúncio",
-      "discountType": "FIXED",
-      "discountValue": 44
-    }
+    "onPageCoupon": null
   },
   {
     "itemId": "MLB40494896",
@@ -246,7 +242,7 @@
     "salesCountText": "+500mil vendidos",
     "isFull": true,
     "onPageCoupon": {
-      "label": "R$ 20 OFF no Anúncio",
+      "label": "Cupom de Loja (R$ 20 OFF conforme compra mínima no ML)",
       "discountType": "FIXED",
       "discountValue": 20
     }
@@ -273,11 +269,7 @@
     "originalUrl": "https://www.mercadolivre.com.br/jogo-de-toalhas-4-pcs-fio-cardado-100-algodao-bosco-karsten/p/MLB54076558",
     "salesCountText": "+10mil vendidos",
     "isFull": true,
-    "onPageCoupon": {
-      "label": "R$ 15 OFF no Anúncio",
-      "discountType": "FIXED",
-      "discountValue": 15
-    }
+    "onPageCoupon": null
   },
   {
     "itemId": "MLB42978348",
@@ -494,7 +486,7 @@
     "salesCountText": "+250mil vendidos",
     "isFull": true,
     "onPageCoupon": {
-      "label": "R$ 8 OFF no Anúncio",
+      "label": "Cupom de Loja (R$ 8 OFF conforme compra mínima no ML)",
       "discountType": "FIXED",
       "discountValue": 8
     }
@@ -539,8 +531,8 @@
     "itemId": "MLB3932958429",
     "title": "Kit 02 Mantas Para Sofá Decorativo 2,20 X 1,50 Melhor Preço",
     "originalPrice": 80,
-    "currentPrice": 48.65,
-    "discountPercentage": 39,
+    "currentPrice": 51.59,
+    "discountPercentage": 35,
     "imageUrl": "https://http2.mlstatic.com/D_Q_NP_2X_893350-MLB117194507942_102026-AB-kit-02-mantas-para-sofa-decorativo-220-x-150-melhor-preco.webp",
     "originalUrl": "https://produto.mercadolivre.com.br/MLB-3932958429-kit-02-mantas-para-sofa-decorativo-220-x-150-melhor-preco-_JM",
     "salesCountText": "+1000 vendidos",
@@ -678,7 +670,7 @@
     "salesCountText": "+100mil vendidos",
     "isFull": true,
     "onPageCoupon": {
-      "label": "R$ 8 OFF no Anúncio",
+      "label": "Cupom de Loja (R$ 8 OFF conforme compra mínima no ML)",
       "discountType": "FIXED",
       "discountValue": 8
     }
@@ -705,11 +697,7 @@
     "originalUrl": "https://www.mercadolivre.com.br/creatina-dark-lab-premium-pure-em-po-sem-sabor-x-500g/p/MLB26796581",
     "salesCountText": "+1mil vendidos",
     "isFull": true,
-    "onPageCoupon": {
-      "label": "R$ 20 OFF no Anúncio",
-      "discountType": "FIXED",
-      "discountValue": 20
-    }
+    "onPageCoupon": null
   },
   {
     "itemId": "MLB35556218",
@@ -835,8 +823,8 @@
     "itemId": "MLB605239077",
     "title": "Lavadora Lava Jato Portátil Pressão 2 Baterias + Maleta Preto 127/220v 50 Hz X 60 Hz",
     "originalPrice": 229.9,
-    "currentPrice": 96.88,
-    "discountPercentage": 57,
+    "currentPrice": 102.26,
+    "discountPercentage": 55,
     "imageUrl": "https://http2.mlstatic.com/D_Q_NP_2X_710675-MLB89102120983_082025-AB--lavadora-lava-jato-portatil-pressao-2-baterias--maleta.webp",
     "originalUrl": "https://www.mercadolivre.com.br/lavadora-lava-jato-portatil-pressao-2-baterias--maleta/up/MLBU605239077",
     "salesCountText": "+100mil vendidos",
@@ -1154,7 +1142,7 @@
     "salesCountText": "+100mil vendidos",
     "isFull": false,
     "onPageCoupon": {
-      "label": "R$ 10 OFF no Anúncio",
+      "label": "Cupom de Loja (R$ 10 OFF conforme compra mínima no ML)",
       "discountType": "FIXED",
       "discountValue": 10
     }
@@ -1397,11 +1385,7 @@
     "originalUrl": "https://www.mercadolivre.com.br/creatina-dark-lab-premium-pure-em-po-sem-sabor-x-300g/p/MLB19506691",
     "salesCountText": "+1mil vendidos",
     "isFull": true,
-    "onPageCoupon": {
-      "label": "R$ 20 OFF no Anúncio",
-      "discountType": "FIXED",
-      "discountValue": 20
-    }
+    "onPageCoupon": null
   },
   {
     "itemId": "MLB3054985330",
@@ -1665,11 +1649,7 @@
     "originalUrl": "https://produto.mercadolivre.com.br/MLB-5117726760-lavadora-de-alta-presso-lav-1600-1600-lbfpol-vonder-_JM",
     "salesCountText": "+10mil vendidos",
     "isFull": true,
-    "onPageCoupon": {
-      "label": "R$ 50 OFF no Anúncio",
-      "discountType": "FIXED",
-      "discountValue": 50
-    }
+    "onPageCoupon": null
   },
   {
     "itemId": "MLB15578941",
@@ -1843,8 +1823,8 @@
     "itemId": "MLB2085859759",
     "title": "Kit Hidrabene Linha Clareadora Sabonete Serum E Protetor 70",
     "originalPrice": 219.49,
-    "currentPrice": 71.19,
-    "discountPercentage": 67,
+    "currentPrice": 79.1,
+    "discountPercentage": 63,
     "imageUrl": "https://http2.mlstatic.com/D_Q_NP_2X_874695-MLB117658328489_092026-AB.webp",
     "originalUrl": "https://www.mercadolivre.com.br/kit-hidrabene-linha-clareadora-sabonete-serum-e-protetor-70/p/MLB2085859759",
     "salesCountText": "+1000 vendidos",
@@ -1921,11 +1901,7 @@
     "originalUrl": "https://www.mercadolivre.com.br/kit-carenagem--biz-125-completa-2011-a-2017-ks-es-ex/up/MLBU5112661833",
     "salesCountText": "+1mil vendidos",
     "isFull": false,
-    "onPageCoupon": {
-      "label": "R$ 46 OFF no Anúncio",
-      "discountType": "FIXED",
-      "discountValue": 46
-    }
+    "onPageCoupon": null
   },
   {
     "itemId": "MLB40583845",
@@ -1962,7 +1938,7 @@
     "salesCountText": "+5mil vendidos",
     "isFull": true,
     "onPageCoupon": {
-      "label": "R$ 8 OFF no Anúncio",
+      "label": "Cupom de Loja (R$ 8 OFF conforme compra mínima no ML)",
       "discountType": "FIXED",
       "discountValue": 8
     }
@@ -2014,7 +1990,7 @@
     "salesCountText": "+10mil vendidos",
     "isFull": true,
     "onPageCoupon": {
-      "label": "5% OFF no Anúncio",
+      "label": "Cupom de Loja (5% OFF conforme regras no ML)",
       "discountType": "PERCENT",
       "discountValue": 5
     }

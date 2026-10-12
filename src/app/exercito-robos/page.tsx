@@ -242,12 +242,11 @@ export default function ExercitoRobosPage() {
       if (found) return found;
     }
     const manualCode = selectedCouponByDeal[deal.id];
-    if (manualCode) {
-      if (manualCode === "NONE") return null;
+    if (manualCode && manualCode !== "NONE") {
       const found = deal.applicableCoupons.find((c) => c.code === manualCode);
       if (found) return found;
     }
-    return deal.bestCoupon;
+    return null;
   };
 
   const handleDispatchSingle = async (deal: MatchedDeal) => {
@@ -752,43 +751,43 @@ export default function ExercitoRobosPage() {
                     </div>
                   </div>
 
-                  {/* Caixa de Cupom Real no Anúncio ou Código */}
+                  {/* Caixa de Cupom Real no Anúncio ou Código (Opcional para não distorcer o preço real do anúncio) */}
                   <div
                     className={`rounded-xl p-3 mb-3 space-y-1.5 border ${
                       activeCoupon
-                        ? "bg-sky-50/90 border-sky-200"
+                        ? "bg-emerald-50/90 border-emerald-300"
+                        : deal.bestCoupon
+                        ? "bg-amber-50/60 border-amber-200"
                         : "bg-slate-50 border-slate-200/80"
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span
                         className={`text-[11px] font-extrabold flex items-center gap-1.5 ${
-                          activeCoupon ? "text-sky-900" : "text-slate-600"
+                          activeCoupon
+                            ? "text-emerald-900"
+                            : deal.bestCoupon
+                            ? "text-amber-900"
+                            : "text-slate-600"
                         }`}
                       >
-                        <Ticket className="w-3.5 h-3.5 text-sky-600" />
+                        <Ticket className="w-3.5 h-3.5 text-amber-600" />
                         <span>
                           {activeCoupon
-                            ? activeCoupon.isCheckboxCoupon
-                              ? `✅ ${deal.onPageCouponText} (Ativar na página do anúncio!)`
-                              : `🎟️ Cupom Aplicável: ${activeCoupon.code}`
-                            : "Oferta Relâmpago (Sem cupom extra no anúncio)"}
+                            ? `✅ Cupom Aplicado: ${activeCoupon.discountLabel}`
+                            : deal.bestCoupon
+                            ? `🎟️ Cupom Opcional Disponível (${deal.bestCoupon.discountLabel})`
+                            : `✅ Preço Real da Oferta no ML (${deal.dealDiscountPct}% OFF)`}
                         </span>
                       </span>
                     </div>
 
-                    {activeCoupon?.isCheckboxCoupon && (
-                      <p className="text-[10px] text-sky-800 font-medium">
-                        💡 Basta abrir o link do anúncio e marcar a caixinha azul <b>&quot;Aplicar cupom&quot;</b> abaixo do preço!
-                      </p>
-                    )}
-
-                    {deal.applicableCoupons.length > 1 && (
+                    {deal.applicableCoupons.length > 0 && (
                       <select
                         value={
                           selectedCouponCode !== "ALL"
                             ? selectedCouponCode
-                            : selectedCouponByDeal[deal.id] || deal.bestCoupon?.code || ""
+                            : selectedCouponByDeal[deal.id] || "NONE"
                         }
                         onChange={(e) =>
                           setSelectedCouponByDeal((prev) => ({
@@ -796,16 +795,17 @@ export default function ExercitoRobosPage() {
                             [deal.id]: e.target.value,
                           }))
                         }
-                        className="w-full rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none"
+                        className="w-full rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none"
                       >
+                        <option value="NONE">
+                          Manter Preço Real do Anúncio (R$ {deal.dealPrice.toFixed(2).replace(".", ",")})
+                        </option>
                         {deal.applicableCoupons.map((c) => (
                           <option key={c.code} value={c.code}>
-                            {c.isCheckboxCoupon ? "✅ No Anúncio" : `🎟️ ${c.code}`} (-R${" "}
-                            {c.couponSavings.toFixed(2).replace(".", ",")}) → Sai por R${" "}
+                            Simular c/ Cupom: {c.discountLabel} → R${" "}
                             {c.finalPrice.toFixed(2).replace(".", ",")}
                           </option>
                         ))}
-                        <option value="NONE">Sem cupom (R$ {deal.dealPrice.toFixed(2)})</option>
                       </select>
                     )}
                   </div>
