@@ -5,6 +5,7 @@ import { MercadoLivreScraperService } from "@/modules/marketplaces/mercadolivre"
 import { generateOfferMessage } from "@/modules/templates/engine";
 
 export const dynamic = "force-dynamic";
+export const preferredRegion = "gru1";
 
 export async function GET(request: Request) {
   try {

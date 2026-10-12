@@ -2,7 +2,15 @@ import { prisma } from "@/lib/prisma";
 import { MercadoLivreScraperService } from "@/modules/marketplaces/mercadolivre";
 import liveCatalogSnapshot from "./meli-live-catalog.json";
 
-export type NicheSlug = "casa" | "moda" | "beleza" | "tech" | "ferramentas";
+export type NicheSlug =
+  | "casa"
+  | "moda"
+  | "calcados"
+  | "perfumaria"
+  | "beleza"
+  | "cabelos"
+  | "tech"
+  | "ferramentas";
 
 export interface RobotAgentInfo {
   id: string;
@@ -72,14 +80,211 @@ export interface MatchedMeliDeal {
 
 export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
   {
+    id: "robo-perfumaria",
+    name: "Robô #01 • Perfumaria (Boticário & Eudora)",
+    nicheSlug: "perfumaria",
+    categoryName: "Perfumaria & Boticário",
+    emoji: "🌸",
+    description: "Especialista em O Boticário (Floratta, Lily, Egeo, Liz), Eudora, Natura, Body Splash e Importados.",
+    keywords: [
+      "perfume",
+      "colonia",
+      "colônia",
+      "boticario",
+      "boticário",
+      "floratta",
+      "lily",
+      "egeo",
+      "glamour",
+      "liz ",
+      "her code",
+      "coffee woman",
+      "body splash",
+      "bodysplash",
+      "deo parfum",
+      "eau de parfum",
+      "eudora",
+      "natura",
+      "tododia",
+      "essencial",
+      "una ",
+      "luna ",
+      "la vie est belle",
+      "good girl",
+      "212 ",
+      "importado",
+    ],
+    status: "ONLINE",
+  },
+  {
+    id: "robo-calcados",
+    name: "Robô #02 • Tênis, Calçados & Bolsas",
+    nicheSlug: "calcados",
+    categoryName: "Calçados & Bolsas",
+    emoji: "👟",
+    description: "Especialista em Tênis Femininos (Vizzano, Olympikus, Nike, Adidas, Moleca), Sandálias, Botas e Bolsas.",
+    keywords: [
+      "tenis",
+      "tênis",
+      "sandalia",
+      "sandália",
+      "vizzano",
+      "beira rio",
+      "moleca",
+      "olympikus",
+      "kolosh",
+      "ramarim",
+      "dakota",
+      "piccadilly",
+      "via marte",
+      "scarpin",
+      "sapatilha",
+      "rasteirinha",
+      "tamanco",
+      "bota ",
+      "coturno",
+      "chinelo",
+      "sapato",
+      "bolsa",
+      "tiracolo",
+      "transversal",
+      "carteira feminina",
+      "mochila feminina",
+    ],
+    status: "ONLINE",
+  },
+  {
+    id: "robo-moda",
+    name: "Robô #03 • Moda Feminina & Roupas",
+    nicheSlug: "moda",
+    categoryName: "Moda & Vestuário",
+    emoji: "👗",
+    description: "Especialista em vestidos, calças jeans, leggings, blusas, conjuntos, pijamas, lingerie e biquínis.",
+    keywords: [
+      "vestido",
+      "calca",
+      "calça",
+      "jeans",
+      "legging",
+      "blusa",
+      "cropped",
+      "camisa",
+      "camiseta",
+      "conjunto",
+      "saia",
+      "short",
+      "bermuda",
+      "moletom",
+      "jaqueta",
+      "casaco",
+      "blazer",
+      "macacao",
+      "macacão",
+      "pijama",
+      "lingerie",
+      "calcinha",
+      "sutia",
+      "sutiã",
+      "biquini",
+      "biquíni",
+      "maio",
+      "maiô",
+      "moda",
+    ],
+    status: "ONLINE",
+  },
+  {
+    id: "robo-beleza",
+    name: "Robô #04 • Maquiagem & Skincare",
+    nicheSlug: "beleza",
+    categoryName: "Maquiagem & Skincare",
+    emoji: "💄",
+    description: "Especialista em bases, batons, rímel, corretivos, hidratantes faciais/corporais, séruns e protetor solar.",
+    keywords: [
+      "maquiagem",
+      "batom",
+      "base ",
+      "corretivo",
+      "rimel",
+      "rímel",
+      "mascara de cilios",
+      "máscara de cílios",
+      "blush",
+      "paleta",
+      "po compacto",
+      "pó compacto",
+      "gloss",
+      "delineador",
+      "skincare",
+      "hidratante",
+      "nivea",
+      "cerave",
+      "la roche",
+      "vichy",
+      "isdin",
+      "neutrogena",
+      "principia",
+      "sallve",
+      "protetor solar",
+      "serum",
+      "sérum",
+      "acido hialuronico",
+      "vitamina c",
+      "agua micelar",
+      "creme",
+      "oleo corporal",
+      "depilador",
+    ],
+    status: "ONLINE",
+  },
+  {
+    id: "robo-cabelos",
+    name: "Robô #05 • Cabelos & Salão em Casa",
+    nicheSlug: "cabelos",
+    categoryName: "Cabelos & Salão",
+    emoji: "💇‍♀️",
+    description: "Especialista em escovas secadoras, chapinhas, secadores, kits shampoo/máscara (Siàge, L'Oréal, Lola, Truss).",
+    keywords: [
+      "cabelo",
+      "capilar",
+      "shampoo",
+      "condicionador",
+      "mascara capilar",
+      "máscara capilar",
+      "cronograma",
+      "siage",
+      "siàge",
+      "loreal",
+      "l'oréal",
+      "elseve",
+      "truss",
+      "lola ",
+      "wella",
+      "pantene",
+      "tresemme",
+      "oleo extraordinario",
+      "reparador de pontas",
+      "escova secadora",
+      "escova rotativa",
+      "secador",
+      "chapinha",
+      "prancha",
+      "modelador",
+      "babyliss",
+      "taiff",
+    ],
+    status: "ONLINE",
+  },
+  {
     id: "robo-casa",
-    name: "Robô #01 • Casa & Cozinha",
+    name: "Robô #06 • Casa, Cozinha & Cama",
     nicheSlug: "casa",
     categoryName: "Casa & Cozinha",
     emoji: "🏠",
-    description: "Garimpa Air Fryers, eletroportáteis, aspiradores, panelas, cama/mesa/banho e utilidades.",
+    description: "Garimpa Air Fryers, jogos de panelas, lençóis, toalhas, aspiradores, cafeteiras e utilidades.",
     keywords: [
       "air fryer",
+      "airfryer",
       "fritadeira",
       "aspirador",
       "panela",
@@ -87,13 +292,16 @@ export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
       "cozinha",
       "organizador",
       "lençol",
+      "lencol",
       "toalha",
+      "cama",
+      "edredom",
+      "travesseiro",
+      "colchão",
       "cafeteira",
       "casa",
       "mop",
       "garrafa",
-      "colchão",
-      "travesseiro",
       "micro-ondas",
       "forno",
       "ventilador",
@@ -104,98 +312,30 @@ export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
       "purificador",
       "batedeira",
       "ferro de passar",
-      "edredom",
-    ],
-    status: "ONLINE",
-  },
-  {
-    id: "robo-moda",
-    name: "Robô #02 • Moda & Calçados",
-    nicheSlug: "moda",
-    categoryName: "Moda & Vestuário",
-    emoji: "👗",
-    description: "Garimpa vestidos, camisas, conjuntos, tênis, calçados, bolsas e moda íntima.",
-    keywords: [
-      "vestido",
-      "camisa",
-      "camiseta",
-      "calça",
-      "tênis",
-      "tenis",
-      "sandália",
-      "sandalia",
-      "bolsa",
-      "moletom",
-      "blusa",
-      "jaqueta",
-      "polo",
-      "linho",
-      "moda",
-      "feminino",
-      "masculina",
-      "masculino",
-      "cueca",
-      "calcinha",
-      "meia",
-      "sapato",
-      "bota",
-      "chinelo",
-      "bermuda",
-      "short",
-    ],
-    status: "ONLINE",
-  },
-  {
-    id: "robo-beleza",
-    name: "Robô #03 • Beleza & Saúde",
-    nicheSlug: "beleza",
-    categoryName: "Beleza & Saúde",
-    emoji: "💄",
-    description: "Garimpa skincare, cremes, suplementos/whey, pranchas, secadores, perfumes e maquiagem.",
-    keywords: [
-      "nivea",
-      "creme",
-      "prancha",
-      "chapinha",
-      "secador",
-      "escova",
-      "maquiagem",
-      "perfume",
-      "hidratante",
-      "shampoo",
-      "facial",
-      "protetor solar",
-      "beleza",
-      "batom",
-      "sérum",
-      "serum",
-      "whey",
-      "creatina",
-      "suplemento",
-      "vitamina",
-      "colágeno",
-      "colageno",
-      "barbeador",
-      "depilador",
-      "desodorante",
-      "fralda",
     ],
     status: "ONLINE",
   },
   {
     id: "robo-tech",
-    name: "Robô #04 • Eletrônicos & Tech",
+    name: "Robô #07 • Relógios, Acessórios & Tech",
     nicheSlug: "tech",
-    categoryName: "Eletrônicos & Tech",
-    emoji: "📱",
-    description: "Garimpa fones Bluetooth, caixas de som, smartwatches, Smart TVs, celulares e notebooks.",
+    categoryName: "Relógios, Joias & Tech",
+    emoji: "⌚",
+    description: "Garimpa relógios femininos, colares, brincos, óculos de sol, smartwatches, celulares, fones e TVs.",
     keywords: [
+      "relogio",
+      "relógio",
+      "colar",
+      "brinco",
+      "pulseira",
+      "anel",
+      "semijoia",
+      "oculos",
+      "óculos",
+      "smartwatch",
       "fone",
       "bluetooth",
       "tws",
-      "smartwatch",
-      "relógio",
-      "relogio",
       "caixa de som",
       "jbl",
       "smart tv",
@@ -207,27 +347,18 @@ export const MELI_NICHE_ROBOTS: RobotAgentInfo[] = [
       "samsung",
       "motorola",
       "xiaomi",
-      "carregador",
       "notebook",
       "tablet",
-      "mouse",
-      "teclado",
-      "monitor",
-      "console",
-      "playstation",
-      "camera",
-      "câmera",
-      "impressora",
     ],
     status: "ONLINE",
   },
   {
     id: "robo-ferramentas",
-    name: "Robô #05 • Ferramentas & Auto",
+    name: "Robô #08 • Ferramentas & Utilidades",
     nicheSlug: "ferramentas",
     categoryName: "Ferramentas",
     emoji: "🛠️",
-    description: "Garimpa parafusadeiras, furadeiras, maletas de ferramentas, pneus, lavadoras e auto.",
+    description: "Garimpa parafusadeiras, furadeiras, maletas de ferramentas, lavadoras de pressão e automotivo.",
     keywords: [
       "furadeira",
       "parafusadeira",
@@ -285,18 +416,31 @@ const FEMALE_KEYWORDS = [
   "blusa",
   "saia",
   "cropped",
-  "calça feminina",
+  "calca",
+  "calça",
+  "jeans",
+  "legging",
+  "conjunto",
   "bolsa",
+  "tenis",
+  "tênis",
   "sandalia",
   "sandália",
   "scarpin",
   "salto",
   "sapatilha",
-  "bota feminina",
+  "bota",
   "tamanco",
   "rasteirinha",
   "vizzano",
   "beira rio",
+  "moleca",
+  "olympikus",
+  "kolosh",
+  "ramarim",
+  "dakota",
+  "piccadilly",
+  "via marte",
   "perfume",
   "colonia",
   "colônia",
@@ -314,7 +458,10 @@ const FEMALE_KEYWORDS = [
   "her code",
   "liz ",
   "eudora",
+  "siage",
+  "siàge",
   "natura",
+  "tododia",
   "hidratante",
   "creme corporal",
   "oleo corporal",
@@ -325,13 +472,15 @@ const FEMALE_KEYWORDS = [
   "rímel",
   "mascara de cilios",
   "máscara de cílios",
-  "base liquida",
+  "base ",
   "corretivo",
   "blush",
   "paleta",
+  "gloss",
   "skincare",
   "serum",
   "sérum",
+  "protetor solar",
   "agua micelar",
   "água micelar",
   "cabelo",
@@ -353,9 +502,17 @@ const FEMALE_KEYWORDS = [
   "sutiã",
   "sutia",
   "calcinha",
-  "pijama feminino",
+  "pijama",
   "biquini",
   "biquíni",
+  "relogio feminino",
+  "colar",
+  "brinco",
+  "pulseira",
+  "panela",
+  "air fryer",
+  "lencol",
+  "toalha",
 ];
 
 const MALE_OR_HEAVY_TOOL_EXCLUSIONS = [
@@ -544,7 +701,7 @@ export class MeliRobotArmyService {
   }
 
   /**
-   * Busca AO VIVO um produto específico no Mercado Livre (ex: "perfume boticario", "vestido feminino")
+   * Busca AO VIVO um produto específico no Mercado Livre (ex: "perfume boticario", "tenis", "vestido feminino")
    * ou filtra apenas o universo feminino ("Só Produtos Femininos")
    */
   static async scrapeLiveMercadoLivreByQuery(
@@ -555,9 +712,20 @@ export class MeliRobotArmyService {
     const seenUrls = new Set<string>();
     const results: RawScrapedMeliItem[] = [];
 
-    // 1. Se o usuário digitou um produto específico (ex: "perfume boticario", "bolsa feminina", "chapinha")
+    // 1. Se o usuário digitou um produto específico (ex: "tenis", "perfume boticario", "bolsa feminina", "chapinha")
     if (cleanQuery && cleanQuery !== "feminino" && cleanQuery !== "produtos femininos") {
-      const slug = cleanQuery.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      let slug = cleanQuery.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      if (
+        onlyFemale &&
+        !slug.includes("feminin") &&
+        !slug.includes("boticario") &&
+        !slug.includes("eudora") &&
+        !slug.includes("floratta") &&
+        !slug.includes("lily")
+      ) {
+        slug = `${slug}-feminino`;
+      }
+
       if (slug.length >= 2) {
         try {
           const controller = new AbortController();
@@ -578,7 +746,10 @@ export class MeliRobotArmyService {
             const html = await res.text();
             const liveCards = this.parseCardsFromMeliHtml(html, seenUrls, cleanQuery, onlyFemale);
             for (const c of liveCards) {
-              if (onlyFemale && !this.isFemaleProduct(c.title, cleanQuery, false)) continue;
+              const normCardTitle = this.normalizeSearchQuery(c.title);
+              if (onlyFemale && MALE_OR_HEAVY_TOOL_EXCLUSIONS.some((ex) => normCardTitle.includes(ex))) {
+                continue;
+              }
               results.push(c);
             }
           }
@@ -587,10 +758,10 @@ export class MeliRobotArmyService {
         }
       }
 
-      // Complementa / faz fallback com o catálogo real de 360 produtos
+      // Complementa / faz fallback com o super catálogo real de 877 produtos dos 8 Robôs Especialistas
       const queryTokens = cleanQuery
         .split(/\s+/)
-        .filter((w) => w.length > 2 && !["para", "com", "dos", "das", "uma", "kit", "so", "produtos"].includes(w));
+        .filter((w) => w.length >= 2 && !["para", "com", "dos", "das", "uma", "so", "produtos", "de", "do", "da"].includes(w));
 
       if (Array.isArray(liveCatalogSnapshot)) {
         for (const snap of liveCatalogSnapshot as any[]) {
@@ -599,12 +770,13 @@ export class MeliRobotArmyService {
           const matchesAll =
             queryTokens.length > 0 && queryTokens.every((tk) => haystack.includes(tk));
           const matchesAny =
-            results.length === 0 &&
+            results.length < 15 &&
             queryTokens.length > 0 &&
             queryTokens.some((tk) => haystack.includes(tk));
 
           if (matchesAll || matchesAny) {
-            if (onlyFemale && !this.isFemaleProduct(snap.title, snap.searchTag, snap.isFemale)) {
+            const normSnapTitle = this.normalizeSearchQuery(snap.title);
+            if (onlyFemale && MALE_OR_HEAVY_TOOL_EXCLUSIONS.some((ex) => normSnapTitle.includes(ex))) {
               continue;
             }
             seenUrls.add(snap.originalUrl);
@@ -631,7 +803,6 @@ export class MeliRobotArmyService {
 
     // 2. Se o usuário ativou "Só Produtos Femininos" sem termo específico (ou buscou "produtos femininos")
     if (Array.isArray(liveCatalogSnapshot)) {
-      // Prioriza primeiro os itens das vitrines femininas (Boticário, Eudora, Vestidos, Bolsas, Sandálias, Maquiagem, Cabelo)
       const sortedSnap = [...(liveCatalogSnapshot as any[])].sort((a, b) => {
         const aSpecific = a.searchTag && a.searchTag !== "OFERTAS_DIA" ? 1 : 0;
         const bSpecific = b.searchTag && b.searchTag !== "OFERTAS_DIA" ? 1 : 0;
@@ -664,7 +835,7 @@ export class MeliRobotArmyService {
 
   /**
    * Raspa AO VIVO a página oficial https://www.mercadolivre.com.br/ofertas
-   * extraindo os cards reais do dia e os cupons nativos ativos no anúncio ("OFF com Cupom")
+   * e combina com o catálogo dos 8 Robôs Especialistas (877 ofertas reais)
    */
   static async scrapeLiveMercadoLivreDailyOffers(forceRefresh = false) {
     if (
@@ -710,14 +881,10 @@ export class MeliRobotArmyService {
       })
     );
 
-    // Complementa ou faz fallback com o catálogo completo (Ofertas do Dia + Feminino/Boticário)
+    // Une com o catálogo completo dos 8 Robôs Especialistas para que todos os 8 robôs tenham dezenas de ofertas ativas
     if (Array.isArray(liveCatalogSnapshot)) {
       for (const snap of liveCatalogSnapshot as any[]) {
         if (seenUrls.has(snap.originalUrl)) continue;
-        // Na visão geral padrão, inclui todas as Ofertas do Dia + destaques femininos se a coleta ao vivo vier vazia
-        if (extractedItems.length > 40 && snap.searchTag && snap.searchTag !== "OFERTAS_DIA") {
-          continue;
-        }
         seenUrls.add(snap.originalUrl);
         extractedItems.push({
           itemId: snap.itemId,
@@ -753,7 +920,7 @@ export class MeliRobotArmyService {
   }
 
   /**
-   * Classifica automaticamente o nicho de um produto pelo título e categoria
+   * Classifica automaticamente o nicho de um produto pelo título e categoria entre os 8 Robôs Especialistas
    */
   static classifyNiche(title: string, rawCategory?: string): {
     nicheSlug: NicheSlug;
@@ -761,10 +928,10 @@ export class MeliRobotArmyService {
     robotId: string;
     robotName: string;
   } {
-    const text = `${title || ""} ${rawCategory || ""}`.toLowerCase();
+    const text = this.normalizeSearchQuery(`${title || ""} ${rawCategory || ""}`);
 
     for (const robot of MELI_NICHE_ROBOTS) {
-      if (robot.keywords.some((kw) => text.includes(kw))) {
+      if (robot.keywords.some((kw) => text.includes(this.normalizeSearchQuery(kw)))) {
         return {
           nicheSlug: robot.nicheSlug,
           categoryName: robot.categoryName,
@@ -774,44 +941,11 @@ export class MeliRobotArmyService {
       }
     }
 
-    if (text.includes("moda") || text.includes("roupa") || text.includes("calçado")) {
-      return {
-        nicheSlug: "moda",
-        categoryName: "Moda & Vestuário",
-        robotId: "robo-moda",
-        robotName: "Robô #02 • Moda & Calçados",
-      };
-    }
-    if (text.includes("beleza") || text.includes("perfume") || text.includes("cabelo") || text.includes("saúde")) {
-      return {
-        nicheSlug: "beleza",
-        categoryName: "Beleza & Saúde",
-        robotId: "robo-beleza",
-        robotName: "Robô #03 • Beleza & Saúde",
-      };
-    }
-    if (text.includes("eletr") || text.includes("tech") || text.includes("inform") || text.includes("gamer")) {
-      return {
-        nicheSlug: "tech",
-        categoryName: "Eletrônicos & Tech",
-        robotId: "robo-tech",
-        robotName: "Robô #04 • Eletrônicos & Tech",
-      };
-    }
-    if (text.includes("ferramenta") || text.includes("auto") || text.includes("moto")) {
-      return {
-        nicheSlug: "ferramentas",
-        categoryName: "Ferramentas",
-        robotId: "robo-ferramentas",
-        robotName: "Robô #05 • Ferramentas & Auto",
-      };
-    }
-
     return {
       nicheSlug: "casa",
       categoryName: "Casa & Cozinha",
       robotId: "robo-casa",
-      robotName: "Robô #01 • Casa & Cozinha",
+      robotName: "Robô #06 • Casa, Cozinha & Cama",
     };
   }
 
@@ -837,10 +971,13 @@ export class MeliRobotArmyService {
 
     const catText = String(dbCoupon.category || "Geral").toLowerCase();
     let nicheSlug: NicheSlug | "all" = "all";
-    if (catText.includes("casa") || catText.includes("cozinha")) nicheSlug = "casa";
+    if (catText.includes("perfum") || catText.includes("botic")) nicheSlug = "perfumaria";
+    else if (catText.includes("calcado") || catText.includes("calçado") || catText.includes("tenis") || catText.includes("bolsa")) nicheSlug = "calcados";
+    else if (catText.includes("cabelo") || catText.includes("salão")) nicheSlug = "cabelos";
+    else if (catText.includes("casa") || catText.includes("cozinha")) nicheSlug = "casa";
     else if (catText.includes("moda") || catText.includes("roupa")) nicheSlug = "moda";
-    else if (catText.includes("beleza") || catText.includes("saúde")) nicheSlug = "beleza";
-    else if (catText.includes("eletr") || catText.includes("tech")) nicheSlug = "tech";
+    else if (catText.includes("beleza") || catText.includes("maquiagem") || catText.includes("saúde")) nicheSlug = "beleza";
+    else if (catText.includes("eletr") || catText.includes("tech") || catText.includes("relogio")) nicheSlug = "tech";
     else if (catText.includes("ferramenta")) nicheSlug = "ferramentas";
 
     return {
@@ -994,8 +1131,7 @@ export class MeliRobotArmyService {
       }
     }
 
-    // Adiciona todas as ofertas reais raspadas ao vivo do Mercado Livre (/ofertas)
-    // Priorizando no topo os produtos que têm Cupom Nativo Ativo no Anúncio!
+    // Adiciona todas as ofertas reais raspadas ao vivo do Mercado Livre
     const sortedLive = [...liveScrapedOffers].sort((a, b) => {
       if (a.onPageCoupon && !b.onPageCoupon) return -1;
       if (!a.onPageCoupon && b.onPageCoupon) return 1;
@@ -1005,6 +1141,7 @@ export class MeliRobotArmyService {
     for (const liveItem of sortedLive) {
       rawItems.push({
         ...liveItem,
+        rawCategory: liveItem.searchTag,
         isLiveFromMeli: true,
       });
 
@@ -1039,13 +1176,16 @@ export class MeliRobotArmyService {
     const dbCouponsList = Array.from(couponsMap.values()).filter((c) => c.source === "DATABASE");
     const allCoupons = Array.from(couponsMap.values());
 
-    // 3. Classifica por Nicho e calcula o preço final com o cupom real do anúncio + cupons cadastrados
+    // 3. Classifica pelos 8 Robôs Especialistas
     const seenTitles = new Set<string>();
     const deals: MatchedMeliDeal[] = [];
     const nicheSummary: Record<string, { count: number; withCouponCount: number }> = {
-      casa: { count: 0, withCouponCount: 0 },
+      perfumaria: { count: 0, withCouponCount: 0 },
+      calcados: { count: 0, withCouponCount: 0 },
       moda: { count: 0, withCouponCount: 0 },
       beleza: { count: 0, withCouponCount: 0 },
+      cabelos: { count: 0, withCouponCount: 0 },
+      casa: { count: 0, withCouponCount: 0 },
       tech: { count: 0, withCouponCount: 0 },
       ferramentas: { count: 0, withCouponCount: 0 },
     };

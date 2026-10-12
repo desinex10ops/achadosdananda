@@ -475,24 +475,24 @@ export default function ExercitoRobosPage() {
         </div>
       )}
 
-      {/* SEÇÃO 1: Os 5 Robôs Separados por Nicho */}
+      {/* SEÇÃO 1: Os 8 Robôs Especialistas Separados por Nicho */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-2">
             <Layers className="w-4 h-4 text-rose-600" />
-            <span>1. Selecione o Robô de Nicho</span>
+            <span>1. Selecione um dos 8 Robôs Especialistas</span>
           </h2>
           {selectedNiche !== "all" && (
             <button
               onClick={() => setSelectedNiche("all")}
               className="text-xs font-bold text-rose-600 hover:underline"
             >
-              Mostrar Todos os Nichos ({deals.length})
+              Mostrar Todos os Robôs ({deals.length})
             </button>
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
           <button
             type="button"
             onClick={() => setSelectedNiche("all")}
@@ -748,13 +748,17 @@ export default function ExercitoRobosPage() {
           </span>
           {[
             { label: "👩 Só Produtos Femininos (Todos)", query: "", female: true },
+            { label: "👟 Tênis Femininos", query: "tenis", female: true },
             { label: "🌸 Perfume O Boticário", query: "perfume boticario", female: true },
             { label: "💜 Eudora & Natura", query: "eudora natura perfume", female: true },
-            { label: "👗 Vestidos & Moda Feminina", query: "vestido moda feminina", female: true },
+            { label: "👗 Vestidos & Moda Feminina", query: "vestido", female: true },
+            { label: "👖 Calça Jeans & Legging", query: "calca legging jeans", female: true },
             { label: "👜 Bolsas Femininas", query: "bolsa feminina", female: true },
-            { label: "👠 Sandálias & Calçados", query: "sandalia feminina", female: true },
-            { label: "💄 Maquiagem & Skincare", query: "maquiagem skincare", female: true },
-            { label: "💇‍♀️ Cabelos (Secador / Escova)", query: "secador escova cabelo", female: true },
+            { label: "👠 Sandálias & Botas", query: "sandalia scarpin bota", female: true },
+            { label: "💄 Maquiagem & Skincare", query: "maquiagem skincare hidratante", female: true },
+            { label: "💇‍♀️ Cabelos (Shampoo / Escova)", query: "cabelo secador escova shampoo", female: true },
+            { label: "⌚ Relógios & Acessórios", query: "relogio colar brinco oculos", female: true },
+            { label: "🍳 Panelas & Air Fryer", query: "panela air fryer cozinha", female: true },
           ].map((preset) => {
             const isSelected =
               activeSearchedTerm === preset.query &&
