@@ -14,8 +14,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Texto original não fornecido." }, { status: 400 });
     }
 
-    // 1. Processa a mensagem no modo CLONE: substitui todos os links pelos links de afiliada da Nanda
-    const { clonedText, replacedLinks } = MirrorEngine.cloneMessage(originalText);
+    // 1. Processa a mensagem no modo CLONE: desencurta links e substitui pelos links de afiliada da Nanda
+    const { clonedText, replacedLinks } = await MirrorEngine.cloneMessageAsync(originalText);
 
     // 2. Busca regras ativas para esse grupo de origem
     let matchingRules: any[] = [];
